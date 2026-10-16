@@ -69,8 +69,18 @@ def sistema():
         dest_dir = os.path.join(QUI, cartella)
         os.makedirs(dest_dir, exist_ok=True)
         dest = os.path.join(dest_dir, nome)
-        if os.path.isfile(dest) and os.path.getmtime(dest) >= os.path.getmtime(sciolto):
-            os.remove(sciolto)          # gia' aggiornato al suo posto
+        # Confronto il CONTENUTO, non la data: un file appena scaricato puo'
+        # avere una data piu' vecchia di quello gia' presente, e andrebbe
+        # scartato proprio l'aggiornamento.
+        if os.path.isfile(dest):
+            with open(dest, "rb") as a, open(sciolto, "rb") as b:
+                uguali = a.read() == b.read()
+            if uguali:
+                os.remove(sciolto)
+                continue
+            os.remove(dest)
+            shutil.move(sciolto, dest)
+            mossi.append(f"{nome} -> {cartella}/  (aggiornato)")
             continue
         shutil.move(sciolto, dest)
         mossi.append(f"{nome} -> {cartella}/")
@@ -80,6 +90,21 @@ def sistema():
             print("  " + m)
         print()
     return mossi
+
+
+def impronta():
+    """Stampa una riga per file, per capire al volo se una copia e' aggiornata."""
+    import hashlib
+    print("\nImpronta dei file (confrontala con quella online se hai dubbi):")
+    for f in ATTESI:
+        p = os.path.join(QUI, f)
+        if not os.path.isfile(p):
+            continue
+        if f.startswith("vendor/"):
+            continue
+        with open(p, "rb") as fh:
+            h = hashlib.sha1(fh.read()).hexdigest()[:8]
+        print(f"  {h}  {f}")
 
 
 def verifica():
@@ -152,7 +177,8 @@ def main():
         t.extractall(DEV, filter="data")
         print(f"  -> .dev/package/")
 
-    verifica()
+    if verifica() and "--impronta" in sys.argv:
+        impronta()
 
 
 if __name__ == "__main__":
