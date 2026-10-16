@@ -11,7 +11,12 @@ import { distribuzione, campiona } from "./avversario.js";
 import { carica as caricaAperture, corrente as aperturaCorrente } from "./aperture.js";
 import { analizza as analizzaStrutture } from "./strutture.js";
 
-const GLIFI = { k: "\u265A", q: "\u265B", r: "\u265C", b: "\u265D", n: "\u265E", p: "\u265F" };
+// U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
+// un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
+const GLIFI = { k: "\u265A\uFE0E", q: "\u265B\uFE0E", r: "\u265C\uFE0E",
+                b: "\u265D\uFE0E", n: "\u265E\uFE0E", p: "\u265F\uFE0E" };
+const SVGNS = "http://www.w3.org/2000/svg";
+let PEZZI_SVG = false;   // true se lo sprite e' stato caricato
 const PROFONDITA = 12;
 const PLIES = 10;
 
@@ -54,17 +59,61 @@ function casa(bd, r, f, ch) {
   d.className = (chiara ? "lt" : "dk")
     + (S.sel === nome ? " sel" : "")
     + (S.bersagli.includes(nome) ? " trg" : "");
-  if (ch) {
-    const s = document.createElement("span");
-    s.className = "pc " + (ch === ch.toUpperCase() ? "w" : "b");
-    s.textContent = GLIFI[ch.toLowerCase()];
-    d.appendChild(s);
-  }
+  if (ch) d.appendChild(pezzo(ch));
   const col = chiara ? "#8C7444" : "#EFE7D6";
   if (r === 7) d.appendChild(etichetta("co cf", "abcdefgh"[f], col));
   if (f === 0) d.appendChild(etichetta("co cr", String(8 - r), col));
   d.addEventListener("click", () => clicca(nome));
   bd.appendChild(d);
+}
+
+/** Un pezzo: SVG se lo sprite c'e', altrimenti il glifo tipografico. */
+function pezzo(ch) {
+  const colore = ch === ch.toUpperCase() ? "w" : "b";
+  const tipo = ch.toLowerCase();
+
+  if (PEZZI_SVG) {
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("viewBox", "0 0 40 40");
+    svg.setAttribute("class", "pz");
+    svg.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS(SVGNS, "use");
+    // href e xlink:href: il secondo serve ai browser piu' vecchi
+    use.setAttribute("href", "#" + colore + tipo);
+    use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#" + colore + tipo);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  const s = document.createElement("span");
+  s.className = "pc " + colore;
+  s.textContent = GLIFI[tipo];
+  return s;
+}
+
+/**
+ * Inietta lo sprite dei pezzi nella pagina.
+ *
+ * Va iniettato, non referenziato dall'esterno: <use href="file.svg#id"> non e'
+ * supportato ovunque, mentre <use href="#id"> nello stesso documento si'.
+ */
+async function caricaPezzi() {
+  try {
+    const r = await fetch("vendor/pezzi.svg");
+    if (!r.ok) throw new Error("pezzi.svg non trovato");
+    const testo = await r.text();
+    const cont = document.createElement("div");
+    cont.innerHTML = testo;
+    const svg = cont.querySelector("svg");
+    if (!svg) throw new Error("pezzi.svg illeggibile");
+    svg.setAttribute("style", "position:absolute;width:0;height:0;overflow:hidden");
+    svg.setAttribute("aria-hidden", "true");
+    document.body.insertBefore(svg, document.body.firstChild);
+    PEZZI_SVG = true;
+  } catch (e) {
+    console.warn("pezzi SVG non disponibili, uso i glifi:", e.message);
+    PEZZI_SVG = false;
+  }
 }
 
 function etichetta(cls, testo, colore) {
@@ -323,6 +372,7 @@ async function indietro() {
 
 async function avvia() {
   window.__avviato = true;   // spegne la diagnostica in index.html
+  await caricaPezzi();
   disegna();
   await caricaAperture();
   S.motore = await new Motore().avvia((t) => {

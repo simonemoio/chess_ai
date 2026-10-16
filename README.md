@@ -77,4 +77,7 @@ Per farlo girare in locale, vedi [SVILUPPO.md](SVILUPPO.md).
 ---
 
 Stockfish è GPL-3.0, quindi lo è anche questo repository. I dati delle aperture
-vengono da [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings) (CC0).
+vengono da [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings)
+(CC0). I pezzi sono quelli di
+[Cburnett](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces/Standard)
+(CC BY-SA 3.0), distribuiti tramite cm-chessboard.

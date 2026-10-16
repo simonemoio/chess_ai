@@ -15,6 +15,7 @@ sotto i limiti.
 
 Cosa scarica:
   vendor/chess.js                       regole del gioco     (BSD-2-Clause)
+  vendor/pezzi.svg                      pezzi Cburnett       (CC BY-SA 3.0)
   vendor/stockfish-18-lite-single.js    motore, caricatore   (GPL-3.0)
   vendor/stockfish-18-lite-single.wasm  motore, binario      (GPL-3.0)
 
@@ -36,6 +37,7 @@ DEV = os.path.join(QUI, ".dev")
 
 SF_VERSIONE = "18.0.8"
 CHESS_VERSIONE = "1.4.0"
+CMB_VERSIONE = "8.15.3"
 
 # Dove va ogni file del progetto. Scaricandoli uno per uno finiscono tutti
 # nella stessa cartella: qui li rimettiamo al loro posto.
@@ -51,6 +53,7 @@ ATTESI = [
     "js/avversario.js", "js/strutture.js", "js/aperture.js",
     "data/aperture.json",
     "vendor/chess.js",
+    "vendor/pezzi.svg",
     "vendor/stockfish-18-lite-single.js",
     "vendor/stockfish-18-lite-single.wasm",
 ]
@@ -126,6 +129,14 @@ def main():
     print("chess.js")
     t = scarica_npm("chess.js", CHESS_VERSIONE)
     estrai(t, "package/dist/esm/chess.js", VENDOR)
+
+    print("pezzi (Cburnett, CC BY-SA 3.0)")
+    t = scarica_npm("cm-chessboard", CMB_VERSIONE)
+    m = t.getmember("package/assets/pieces/standard.svg")
+    m.name = "pezzi.svg"
+    t.extract(m, VENDOR)
+    p = os.path.join(VENDOR, "pezzi.svg")
+    print(f"  -> vendor/pezzi.svg  ({os.path.getsize(p) // 1024} KB)")
 
     print("stockfish")
     t = scarica_npm("stockfish", SF_VERSIONE)
