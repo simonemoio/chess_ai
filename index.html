@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Albero delle probabilità</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F5F2EC; --ink:#16150F; --mut:#6B675C; --line:#DFD8C9;
+  --acc:#A8482A; --cool:#2E6A5F; --card:#FFFFFF; --soft:#EFEADD;
+  --lt:#E9E1CE; --dk:#B08C63;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15140F; --ink:#F0ECE2; --mut:#A49E90; --line:#332F26;
+    --acc:#E08A64; --cool:#6FB3A2; --card:#1D1B15; --soft:#262219;
+    --lt:#C9BFA6; --dk:#8A6B46;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:15px/1.55 "Public Sans",system-ui,-apple-system,sans-serif;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.wrap{max-width:1020px;margin:0 auto;padding:22px 18px 70px;
+ display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:30px;align-items:start}
+@media(max-width:860px){.wrap{grid-template-columns:1fr;gap:22px}}
+h1{font-family:"Fraunces",Georgia,serif;font-size:24px;margin:0 0 3px;font-weight:600;letter-spacing:-.3px}
+.sub{color:var(--mut);font-size:13px;margin:0 0 16px}
+
+.bwrap{container-type:inline-size;width:100%;max-width:430px}
+#board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));
+ grid-template-rows:repeat(8,minmax(0,1fr));width:100%;aspect-ratio:1;
+ border-radius:10px;overflow:hidden;user-select:none;touch-action:manipulation}
+#board div{position:relative;display:flex;align-items:center;justify-content:center;
+ font-size:30px;font-size:8.6cqw;cursor:pointer;line-height:1;overflow:hidden}
+.lt{background:var(--lt)}.dk{background:var(--dk)}
+.sel{outline:3px solid var(--acc);outline-offset:-3px}
+.trg{box-shadow:inset 0 0 0 4px rgba(168,72,42,.35)}
+.pc{pointer-events:none}
+.w{color:#FBF8F1;text-shadow:0 0 1px #16150F,0 1px 1px rgba(22,21,15,.5)}
+.b{color:#16150F;text-shadow:0 1px 1px rgba(251,248,241,.35)}
+.co{position:absolute;font-size:9px;font-size:2.5cqw;font-weight:600;line-height:1;
+ opacity:.65;pointer-events:none;font-variant-numeric:tabular-nums}
+.co.cf{right:5%;bottom:3%}.co.cr{left:5%;top:3%}
+
+.ultima{min-height:24px;margin-top:13px;font-size:14px}
+.ultima b{font-weight:600}
+.ultima .pc2{font-size:12px;color:var(--mut);margin-left:6px}
+.ultima.vuota{color:var(--mut)}
+.bar{display:flex;gap:9px;align-items:center;margin-top:12px;flex-wrap:wrap}
+button{font:inherit;padding:9px 14px;border:1px solid var(--line);background:var(--card);
+ color:var(--ink);border-radius:10px;cursor:pointer;min-height:44px}
+button:hover{border-color:var(--mut)}
+button:disabled{opacity:.5;cursor:default}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
+.chk{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--mut);cursor:pointer;min-height:40px}
+.chk input{width:17px;height:17px;accent-color:var(--cool)}
+.note{color:var(--mut);font-size:12px;margin-top:14px;line-height:1.5}
+.busy{color:var(--mut);font-size:13px;padding:12px 0}
+
+#phead{margin-bottom:14px}
+.ph1{font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px}
+.dot{width:14px;height:14px;border-radius:4px;border:1px solid var(--mut);display:inline-block}
+.dot.wq{background:#FBF8F1}.dot.bq{background:#16150F}
+.ph2{font-size:13px;color:var(--mut);margin-top:5px;line-height:1.45}
+.apbig{margin-top:9px;font-size:13px;color:var(--mut)}
+.apbig b{color:var(--ink);font-weight:600}
+.eco{font-size:10px;font-weight:600;letter-spacing:.4px;background:var(--soft);
+ color:var(--mut);border-radius:5px;padding:2px 6px;margin-left:6px;font-variant-numeric:tabular-nums}
+.legend{margin-top:11px;display:flex;flex-direction:column;gap:5px;
+ background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.legend div{font-size:12.5px;color:var(--mut);display:flex;align-items:baseline;gap:7px}
+.sw{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(1px)}
+.sw.g{background:var(--mut)}.sw.a{background:var(--acc)}
+
+.strut{margin-top:11px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.strut .tit{font-size:14px;font-weight:600}
+.strut .meta{font-size:11.5px;color:var(--mut);margin-top:3px}
+.strut .pl{font-size:12.5px;color:var(--mut);margin-top:7px;line-height:1.45;display:flex;gap:7px;align-items:baseline}
+.strut .q{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;
+ border-radius:5px;padding:2px 6px;flex:0 0 auto}
+.strut .q.b{background:var(--soft);color:var(--mut)}
+.strut .q.n{background:var(--ink);color:var(--bg)}
+.trat{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+.trat span{font-size:11px;background:var(--soft);color:var(--mut);border-radius:5px;padding:3px 7px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px 16px;margin-bottom:10px}
+.card.div{border-color:#D9C8B6}
+.card.pericolo{border-color:#E8C3B2}
+.allarme,.occasione{font-weight:600;font-size:13px;border-radius:9px;padding:8px 11px;margin-bottom:11px}
+.allarme{background:#FDF0EA;border:1px solid #E8C3B2;color:#8A3418}
+.occasione{background:#E6F0EB;border:1px solid #BEDACF;color:#24594F}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.pre{font-size:12px;color:var(--mut);margin-right:7px}
+.mv{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.mv i,.rep i{font-style:normal;margin-right:5px;opacity:.8}
+.tag{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;
+ color:#7A5A12;background:#F6ECD2;border-radius:6px;padding:3px 7px;margin-left:8px}
+.nums{display:flex;white-space:nowrap}
+.nbox{display:inline-flex;flex-direction:column;align-items:flex-end;margin-left:14px}
+.nlab{font-size:10px;letter-spacing:.3px;text-transform:uppercase;color:var(--mut);margin-bottom:1px}
+.obj{color:var(--mut);font-size:16px;font-variant-numeric:tabular-nums}
+.ev{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.apchip{display:inline-block;margin-top:9px;font-size:11.5px;color:var(--mut);
+ background:var(--soft);border-radius:6px;padding:4px 8px}
+.replab{font-size:12px;color:var(--mut);margin-top:13px}
+.pbar{display:flex;gap:3px;height:6px;border-radius:3px;overflow:hidden;margin-top:9px}
+.rep{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.rep span{font-size:12px;font-variant-numeric:tabular-nums;background:var(--soft);
+ border-radius:6px;padding:4px 8px;color:var(--mut)}
+.rep span b{font-weight:600;color:var(--ink)}
+.rep span.mat{background:#F7DFD6;color:#8A3418}
+.rep span.mat b{color:#8A3418}
+.linbtn{margin-top:12px;padding:7px 12px;font-size:13px;min-height:38px;border-radius:9px;color:var(--mut)}
+.lin{margin-top:12px;border-top:1px solid var(--line);padding-top:12px;display:none}
+.lin.on{display:block}
+.linrow{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:baseline;font-variant-numeric:tabular-nums}
+.linrow .num{color:var(--mut);font-size:12px}
+.linrow .me{font-weight:600}
+.linrow .op{color:var(--mut)}
+.linrow sup{font-size:9px;color:var(--mut);margin-left:2px}
+.traj{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--mut);font-variant-numeric:tabular-nums}
+.saldo{margin-top:11px;padding:10px 12px;border-radius:10px;background:var(--soft);
+ display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.saldo .lab{font-size:12px;color:var(--mut)}
+.saldo .val{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.verd{margin-top:11px;padding:10px 12px;border-radius:10px;font-size:13.5px;font-weight:600}
+.verd.win{background:#E6F0EB;border:1px solid #BEDACF;color:#24594F}
+.verd.lose{background:#FDF0EA;border:1px solid #E8C3B2;color:#8A3418}
+.verd.draw{background:var(--soft);border:1px solid var(--line);color:var(--mut)}
+.linnote{font-size:11.5px;color:var(--mut);margin-top:9px;line-height:1.45}
+.avviso{background:#FFF8E8;border:1px solid #E8D9A8;color:#6B5412;border-radius:12px;
+ padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .avviso{background:#2A2314;border-color:#4A3F1F;color:#D8C48A}
+  :root:not([data-theme="light"]) .allarme{background:#2E1A12;border-color:#5A3524;color:#E8A184}
+  :root:not([data-theme="light"]) .occasione{background:#14271F;border-color:#285043;color:#8FD3BE}
+  :root:not([data-theme="light"]) .verd.win{background:#14271F;border-color:#285043;color:#8FD3BE}
+  :root:not([data-theme="light"]) .verd.lose{background:#2E1A12;border-color:#5A3524;color:#E8A184}
+  :root:not([data-theme="light"]) .rep span.mat{background:#3A2017;color:#E8A184}
+  :root:not([data-theme="light"]) .tag{background:#3A3220;color:#D8C48A}
+  :root:not([data-theme="light"]) .card.div{border-color:#4A3F2C}
+  :root:not([data-theme="light"]) .card.pericolo{border-color:#5A3524}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Albero delle probabilità</h1>
+    <p class="sub" id="mode">Avvio del motore…</p>
+    <div class="bwrap"><div id="board"></div></div>
+    <div id="ultima" class="ultima vuota">Tocca a te.</div>
+    <div class="bar">
+      <button id="bUndo">Indietro</button>
+      <button id="bReset">Da capo</button>
+      <button id="bLato">Gioca col nero</button>
+    </div>
+    <div class="bar">
+      <span style="font-size:13px;color:var(--mut)">Avversario</span>
+      <input type="range" id="elo" min="1100" max="1900" step="100" value="1500">
+      <b id="elov" style="font-variant-numeric:tabular-nums">1500</b>
+    </div>
+    <div class="bar">
+      <label class="chk"><input type="checkbox" id="auto" checked> L’avversario muove da solo</label>
+    </div>
+    <p class="note">Clicca un pezzo e poi la casa di arrivo. Dopo ogni mossa la
+      distribuzione si ridisegna: è quello il punto.</p>
+  </div>
+
+  <div>
+    <div class="avviso">
+      <b>L’avversario non è vero.</b> Il modello umano definitivo (Maia) non è ancora
+      collegato: qui c’è un surrogato costruito su Stockfish. Le distribuzioni sono più
+      piatte e più sparse di quelle di un giocatore reale, e la differenza fra 1100 e 1900
+      si sente meno di quanto dovrebbe. Quello da giudicare è <b>l’idea</b>, non i numeri.
+    </div>
+    <div id="phead"></div>
+    <div id="out"><p class="busy">Carico il motore…</p></div>
+  </div>
+</div>
+<!-- Diagnostica: uno script classico, cosi' gira anche se i moduli non si caricano.
+     Senza questo un errore di caricamento lascia la pagina muta. -->
+<script>
+window.__avviato = false;
+window.addEventListener("error", function (e) {
+  if (e.target && e.target.tagName === "SCRIPT") window.__erroreScript = e.target.src;
+}, true);
+
+function _diag(testo) {
+  var d = document.getElementById("out");
+  if (d) d.innerHTML = '<div class="allarme" style="font-weight:400">' + testo + "</div>";
+  var m = document.getElementById("mode");
+  if (m) m.textContent = "Avvio fallito";
+}
+
+setTimeout(function () {
+  if (window.__avviato) return;
+
+  if (location.protocol === "file:") {
+    _diag("<b>Hai aperto il file dal disco.</b><br><br>I browser bloccano moduli, "
+      + "WebAssembly e Worker sotto <code>file://</code>, quindi il motore non parte.<br><br>"
+      + "Apri un terminale in questa cartella e lancia:<br><br>"
+      + "<code>python serve.py</code><br><br>poi vai su <code>http://localhost:8000</code>.");
+    return;
+  }
+
+  var attesi = ["vendor/chess.js", "vendor/stockfish-18-lite-single.js",
+                "vendor/stockfish-18-lite-single.wasm", "data/aperture.json", "js/app.js"];
+  var mancanti = [];
+  var fatti = 0;
+  attesi.forEach(function (f) {
+    fetch(f, { method: "HEAD" }).then(function (r) {
+      if (!r.ok) mancanti.push(f);
+    }).catch(function () {
+      mancanti.push(f);
+    }).then(function () {
+      if (++fatti < attesi.length) return;
+      if (mancanti.length) {
+        _diag("<b>Mancano dei file:</b><br><br><code>" + mancanti.join("</code><br><code>")
+          + "</code><br><br>"
+          + (mancanti.some(function (x) { return x.indexOf("vendor/") === 0; })
+            ? "La cartella <code>vendor/</code> non si scrive a mano: lancia "
+              + "<code>python prepara.py</code> e riprova."
+            : "Controlla di aver scaricato tutte le cartelle, <code>js/</code> e "
+              + "<code>data/</code> comprese."));
+      } else {
+        _diag("<b>I file ci sono tutti ma il codice non parte.</b><br><br>"
+          + (window.__erroreScript ? "Script in errore: <code>" + window.__erroreScript + "</code><br><br>" : "")
+          + "Apri la console del browser (F12, scheda Console) e guarda il primo errore "
+          + "in rosso: dice quale modulo non si carica.");
+      }
+    });
+  });
+}, 4000);
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
