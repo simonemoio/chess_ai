@@ -73,6 +73,8 @@ js/strutture.js         strutture pedonali di mediogioco
 js/aperture.js          nomi e codici ECO
 js/revisione.js         classifica delle tue mosse (imprecisione / errore / grave)
 js/conteggio.js         conteggio visite ed eventi (GoatCounter, spento finché non lo configuri)
+js/teoria.js            schede didattiche di aperture e strutture (testi originali)
+css/temi.css            temi grafici alternativi (neon, HUD, vetro)
 js/app.js               interfaccia e orchestrazione
 data/aperture.json      3864 aperture (lichess-org/chess-openings, CC0)
 vendor/                 scaricato da prepara.py, non scritto a mano

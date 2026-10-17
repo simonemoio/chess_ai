@@ -12,6 +12,7 @@ import { carica as caricaAperture, corrente as aperturaCorrente } from "./apertu
 import { analizza as analizzaStrutture } from "./strutture.js";
 import { valutaMossa, CLASSI, uciDi } from "./revisione.js";
 import { avvia as avviaConteggio, evento } from "./conteggio.js";
+import { schedaApertura, schedaStruttura } from "./teoria.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -44,8 +45,9 @@ const S = {
 
 // Un colore per candidata, nell'ordine del motore (stabile anche quando le
 // schede vengono riordinate per EV). Scelti per staccare su case chiare e scure.
-const COLORI_CAND = ["#1F7A6B", "#2F64B5", "#B0306A", "#6B3FA0"];
-const VERDE = "#2E8B57", ROSSO = "#C0392B", GRIGIO = "#4A463C";
+// I colori veri stanno nei temi (variabili CSS), qui solo i riferimenti.
+const COLORI_CAND = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)"];
+const VERDE = "var(--fr-ok)", ROSSO = "var(--fr-ko)", GRIGIO = "var(--fr-mv)";
 
 const elo = () => +el("elo").value;
 const chiave = (fen) => fen.split(" ").slice(0, 3).join(" ");
@@ -112,9 +114,10 @@ function frecciaSvg(da, a, colore, spessore = 0.17, opacita = 0.85) {
                [bx - nx * largh / 2, by - ny * largh / 2]]
     .map(([x, y]) => x.toFixed(3) + "," + y.toFixed(3)).join(" ");
   return `<g opacity="${opacita}">`
-    + `<path d="${d}" fill="none" stroke="${colore}" stroke-width="${spessore}" `
+    // style e non attributi: le variabili CSS funzionano solo nello style
+    + `<path d="${d}" style="fill:none;stroke:${colore}" stroke-width="${spessore}" `
     + `stroke-linecap="round" stroke-linejoin="round"/>`
-    + `<polygon points="${tri}" fill="${colore}"/></g>`;
+    + `<polygon points="${tri}" style="fill:${colore}"/></g>`;
 }
 
 function disegnaFrecce() {
@@ -149,10 +152,10 @@ function bollini(lista) {
     const [ox, oy] = ANGOLI[(k - 1) % 4];
     const x = (cx + ox).toFixed(3), y = (cy + oy).toFixed(3);
     const op = f.opacita < 0.5 ? 0.35 : 1;
-    return `<g opacity="${op}"><circle cx="${x}" cy="${y}" r="0.19" fill="${f.colore}" `
-      + `stroke="#FBF8F1" stroke-width="0.035"/>`
+    return `<g opacity="${op}" class="bollo"><circle cx="${x}" cy="${y}" r="0.19" `
+      + `style="fill:${f.colore};stroke:var(--bollo)" stroke-width="0.035"/>`
       + `<text x="${x}" y="${y}" dy="0.085" text-anchor="middle" font-size="0.25" font-weight="700" `
-      + `fill="#FFFFFF" font-family="Public Sans,system-ui,sans-serif">${f.rango}</text></g>`;
+      + `style="fill:#FFFFFF;font-family:var(--f-txt)">${f.rango}</text></g>`;
   }).join("");
 }
 
@@ -332,7 +335,7 @@ function casa(bd, r, f, ch) {
     + (S.sel === nome ? " sel" : "")
     + (S.bersagli.includes(nome) ? " trg" : "");
   if (ch) d.appendChild(pezzo(ch));
-  const col = chiara ? "#8C7444" : "#EFE7D6";
+  const col = chiara ? "var(--co-lt)" : "var(--co-dk)";
   if (r === 7) d.appendChild(etichetta("co cf", "abcdefgh"[f], col));
   if (f === 0) d.appendChild(etichetta("co cr", String(8 - r), col));
   d.addEventListener("click", () => clicca(nome));
@@ -472,17 +475,90 @@ function fmtEv(ev) {
   return fmt(ev);
 }
 
+// ------------------------------------------------------------ schede didattiche
+
+const attr = (t) => encodeURIComponent(t);
+
+/** Nome d'apertura cliccabile se c'e' una scheda, testo semplice altrimenti. */
+function nomeApertura(nome, eco) {
+  if (!schedaApertura(nome)) return nome;
+  return `<button class="lnk" data-ap="${attr(nome)}" data-eco="${attr(eco || "")}" `
+    + `title="Leggi la scheda">${nome}</button>`;
+}
+
+function nomeStruttura(chiave, nome) {
+  if (!schedaStruttura(chiave)) return nome;
+  return `<button class="lnk" data-st="${chiave}" data-nome="${attr(nome)}" `
+    + `title="Leggi la scheda">${nome}</button>`;
+}
+
+function piani(bianco, nero) {
+  return `<div class="pl"><span class="q b">bianco</span><span>${bianco}</span></div>`
+    + `<div class="pl"><span class="q n">nero</span><span>${nero}</span></div>`;
+}
+
+function apriScheda(html) {
+  const d = el("scheda");
+  el("schedaCorpo").innerHTML = html;
+  if (typeof d.showModal === "function") { if (!d.open) d.showModal(); }
+  else d.setAttribute("open", "");
+  el("schedaCorpo").scrollTop = 0;
+}
+
+function schedaAperturaHtml(nome, eco) {
+  const r = schedaApertura(nome);
+  if (!r) return null;
+  const x = r.scheda;
+  return `<div class="sk-sopra">Apertura${eco ? `<span class="eco">${eco}</span>` : ""}</div>`
+    + `<h2 class="sk-tit">${x.it}</h2>`
+    + `<div class="sk-orig">${r.chiave}</div>`
+    + (r.esatta ? "" : `<div class="sk-nota">Sei in <b>${nome}</b>: qui sotto la scheda della famiglia.</div>`)
+    + `<div class="sk-mosse">${x.mosse}</div>`
+    + `<p class="sk-idea">${x.idea}</p>`
+    + `<div class="sk-piani">${piani(x.bianco, x.nero)}</div>`
+    + `<div class="sk-att"><b>Attenzione.</b> ${x.attenzione}</div>`;
+}
+
+function schedaStrutturaHtml(chiave, nome) {
+  const x = schedaStruttura(chiave);
+  if (!x) return null;
+  return `<div class="sk-sopra">Struttura pedonale</div>`
+    + `<h2 class="sk-tit">${nome}</h2>`
+    + `<p class="sk-idea">${x.spiegazione}</p>`
+    + `<div class="sk-piani">${piani(x.bianco, x.nero)}</div>`
+    + `<div class="sk-att ric"><b>Da ricordare.</b> ${x.ricorda}</div>`;
+}
+
+// un solo ascoltatore per tutta la pagina: i nomi vengono ridisegnati spesso
+document.addEventListener("click", (ev) => {
+  if (ev.target && ev.target.id === "scheda") { ev.target.close(); return; }   // clic sullo sfondo
+  const b = ev.target.closest && ev.target.closest("[data-ap],[data-st]");
+  if (!b) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  let h = null;
+  if (b.dataset.ap) {
+    h = schedaAperturaHtml(decodeURIComponent(b.dataset.ap), decodeURIComponent(b.dataset.eco || ""));
+    evento("scheda-apertura");
+  } else {
+    h = schedaStrutturaHtml(b.dataset.st, decodeURIComponent(b.dataset.nome || ""));
+    evento("scheda-struttura");
+  }
+  if (h) apriScheda(h);
+});
+
 function strutHtml(St) {
   if (!St) return "";
   let h = "";
   for (const x of St.strutture || []) {
-    h += `<div class="strut"><div class="tit">${x.nome}</div>`
+    h += `<div class="strut"><div class="tit">${nomeStruttura(x.chiave, x.nome)}</div>`
       + `<div class="meta">centro ${St.centro} &middot; ${St.fase}</div>`
       + `<div class="pl"><span class="q b">bianco</span><span>${x.piano_bianco}</span></div>`
       + `<div class="pl"><span class="q n">nero</span><span>${x.piano_nero}</span></div></div>`;
   }
   const t = St.tratti || [];
-  if (t.length) h += `<div class="trat">${t.map((y) => `<span>${y.nome}</span>`).join("")}</div>`;
+  if (t.length) h += `<div class="trat">${t.map((y) => /^Pedone di donna isolato/.test(y.nome)
+    ? `<span>${nomeStruttura("isolato", y.nome)}</span>` : `<span>${y.nome}</span>`).join("")}</div>`;
   return h;
 }
 
@@ -492,7 +568,7 @@ function intestazione(io, lui, ap, St, e) {
     + `Muove il ${io} &mdash; sei tu</div>`
     + `<div class="ph2">Le mosse che potresti giocare. Per ognuna, come risponderebbe `
     + `il ${lui} se fosse un giocatore di ${e}.</div>`
-    + (ap ? `<div class="apbig">Apertura: <b>${ap.nome}</b>`
+    + (ap ? `<div class="apbig">Apertura: <b>${nomeApertura(ap.nome, ap.eco)}</b>`
         + `<span class="eco">${ap.eco}</span>`
         + (ap.in_libro ? "" : " &mdash; sei già fuori dal libro") + "</div>" : "")
     + strutHtml(St)
@@ -505,7 +581,7 @@ function intestazione(io, lui, ap, St, e) {
     + `</div>`;
 }
 
-const PAL = ["#A8482A", "#C6795F", "#DCAF9D"];
+const PAL = ["var(--p1)", "var(--p2)", "var(--p3)"];
 
 function cardHtml(x, lui, e) {
   const big = Math.abs(x.divergenza) >= 40;
@@ -537,7 +613,7 @@ function cardHtml(x, lui, e) {
     + `<span class="nbox"><span class="nlab">contro ${e}</span>`
     + `<span class="ev" style="color:${x.ev >= 0 ? "var(--acc)" : "var(--cool)"}">${fmtEv(x.ev)}</span></span>`
     + `</span></div>`
-    + (x.ap ? `<div class="apchip">porta in <b>${x.ap.nome}</b><span class="eco">${x.ap.eco}</span></div>` : "")
+    + (x.ap ? `<div class="apchip">porta in <b>${nomeApertura(x.ap.nome, x.ap.eco)}</b><span class="eco">${x.ap.eco}</span></div>` : "")
     + `<div class="replab">Il ${lui} risponde</div>`
     + `<div class="pbar">${bars}</div><div class="rep">${reps}</div>`
     + `<button class="linbtn" data-uci="${x.uci}">Come continua</button>`
@@ -618,7 +694,7 @@ async function vediLinea(uci) {
 
   h += `<div class="traj">` + L.mosse.map((m) =>
     `<span>${m.san} <b style="color:${(m.matto !== null && m.matto !== undefined)
-      ? (m.matto > 0 ? "var(--acc)" : "#C06048")
+      ? (m.matto > 0 ? "var(--acc)" : "var(--fr-ko)")
       : (m.cp >= 0 ? "var(--acc)" : "var(--cool)")}">${fmt(m.cp, m.matto)}</b></span>`).join("")
     + "</div>";
 
@@ -631,10 +707,10 @@ async function vediLinea(uci) {
     h += `<div class="verd ${cls}">${L.esito.testo}</div>`;
   }
   if (L.struttura && L.struttura.strutture && L.struttura.strutture.length) {
-    h += `<div class="apchip">porta a <b>${L.struttura.strutture.map((z) => z.nome).join(", ")}</b></div>`;
+    h += `<div class="apchip">porta a <b>${L.struttura.strutture.map((z) => nomeStruttura(z.chiave, z.nome)).join(", ")}</b></div>`;
   }
   if (L.apertura) {
-    h += `<div class="apchip">arriva a <b>${L.apertura.nome}</b><span class="eco">${L.apertura.eco}</span>`
+    h += `<div class="apchip">arriva a <b>${nomeApertura(L.apertura.nome, L.apertura.eco)}</b><span class="eco">${L.apertura.eco}</span>`
       + (L.fuori_libro ? " &mdash; poi fuori dal libro" : "") + "</div>";
   }
   const p = L.prob < 0.1 ? "meno dello 0,1%" : L.prob + "%";
@@ -670,6 +746,27 @@ async function indietro() {
   await analizza();
 }
 
+// ------------------------------------------------------------ temi grafici
+
+function temaAttivo() { return document.documentElement.dataset.tema || "classico"; }
+
+function impostaTemi() {
+  const bottoni = document.querySelectorAll("#temi [data-t]");
+  const segna = () => bottoni.forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.t === temaAttivo())));
+  bottoni.forEach((b) => {
+    b.onclick = () => {
+      const t = b.dataset.t;
+      if (t === "classico") delete document.documentElement.dataset.tema;
+      else document.documentElement.dataset.tema = t;
+      try { localStorage.setItem("tema", t === "classico" ? "" : t); } catch (e) { /* va bene lo stesso */ }
+      segna();
+      evento("tema-" + t);
+    };
+  });
+  segna();
+}
+
 async function avvia() {
   window.__avviato = true;   // spegne la diagnostica in index.html
   avviaConteggio();
@@ -694,6 +791,7 @@ async function avvia() {
     S.auto = el("auto").checked;
     if (S.auto && S.gioco.turn() !== S.mio) await dopoMossa();
   };
+  impostaTemi();
   el("frecceChk").onchange = () => { S.frecce = el("frecceChk").checked; disegnaFrecce(); };
   // frecce della tastiera: scorrono le mosse della partita
   document.addEventListener("keydown", (ev) => {

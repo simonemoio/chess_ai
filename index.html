@@ -6,12 +6,32 @@
 <title>Albero delle probabilità</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Chakra+Petch:wght@500;600;700&family=Sora:wght@400;500;600;700&display=swap">
+<script>
+  // il tema va applicato prima del primo disegno, se no la pagina "lampeggia"
+  try { var t = localStorage.getItem("tema"); if (t) document.documentElement.dataset.tema = t; } catch (e) {}
+</script>
 <style>
 :root{
   --bg:#F5F2EC; --ink:#16150F; --mut:#6B675C; --line:#DFD8C9;
   --acc:#A8482A; --cool:#2E6A5F; --card:#FFFFFF; --soft:#EFEADD;
   --lt:#E9E1CE; --dk:#B08C63;
+  /* coordinate sulle case chiare / scure */
+  --co-lt:#8C7444; --co-dk:#EFE7D6;
+  /* esiti: negativo, positivo, avviso */
+  --ko-bg:#FDF0EA; --ko-bd:#E8C3B2; --ko-tx:#8A3418;
+  --ok-bg:#E6F0EB; --ok-bd:#BEDACF; --ok-tx:#24594F;
+  --wa-bg:#FFF8E8; --wa-bd:#E8D9A8; --wa-tx:#6B5412;
+  --tag-bg:#F6ECD2; --tag-tx:#7A5A12; --mat-bg:#F7DFD6; --div-bd:#D9C8B6;
+  /* frecce: le 4 candidate, mossa giusta / sbagliata / ultima mossa */
+  --c1:#1F7A6B; --c2:#2F64B5; --c3:#B0306A; --c4:#6B3FA0;
+  --fr-ok:#2E8B57; --fr-ko:#C0392B; --fr-mv:#4A463C; --bollo:#FBF8F1;
+  /* barra delle risposte */
+  --p1:#A8482A; --p2:#C6795F; --p3:#DCAF9D;
+  --trg:rgba(168,72,42,.35); --velo:rgba(22,21,15,.45);
+  /* tipografia e forme */
+  --f-tit:"Fraunces",Georgia,serif; --f-txt:"Public Sans",system-ui,-apple-system,sans-serif;
+  --f-num:inherit; --r:15px; --r-s:10px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
@@ -19,6 +39,10 @@
     --bg:#15140F; --ink:#F0ECE2; --mut:#A49E90; --line:#332F26;
     --acc:#E08A64; --cool:#6FB3A2; --card:#1D1B15; --soft:#262219;
     --lt:#C9BFA6; --dk:#8A6B46;
+    --ko-bg:#2E1A12; --ko-bd:#5A3524; --ko-tx:#E8A184;
+    --ok-bg:#14271F; --ok-bd:#285043; --ok-tx:#8FD3BE;
+    --wa-bg:#2A2314; --wa-bd:#4A3F1F; --wa-tx:#D8C48A;
+    --tag-bg:#3A3220; --tag-tx:#D8C48A; --mat-bg:#3A2017; --div-bd:#4A3F2C;
     color-scheme: dark;
   }
 }
@@ -26,28 +50,28 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{
   margin:0; background:var(--bg); color:var(--ink);
-  font:15px/1.55 "Public Sans",system-ui,-apple-system,sans-serif;
+  font:15px/1.55 var(--f-txt);
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
 .wrap{max-width:1020px;margin:0 auto;padding:22px 18px 70px;
  display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:30px;align-items:start}
 @media(max-width:860px){.wrap{grid-template-columns:1fr;gap:22px}}
-h1{font-family:"Fraunces",Georgia,serif;font-size:24px;margin:0 0 3px;font-weight:600;letter-spacing:-.3px}
+h1{font-family:var(--f-tit);font-size:24px;margin:0 0 3px;font-weight:600;letter-spacing:-.3px}
 .sub{color:var(--mut);font-size:13px;margin:0 0 16px}
 
 .bwrap{container-type:inline-size;width:100%;max-width:430px;position:relative}
 #frecce{position:absolute;left:0;top:0;width:100%;aspect-ratio:1;pointer-events:none;overflow:visible}
 #board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));
  grid-template-rows:repeat(8,minmax(0,1fr));width:100%;aspect-ratio:1;
- border-radius:10px;overflow:hidden;user-select:none;touch-action:manipulation}
+ border-radius:var(--r-s);overflow:hidden;user-select:none;touch-action:manipulation}
 #board div{position:relative;display:flex;align-items:center;justify-content:center;
  font-size:30px;font-size:8.6cqw;cursor:pointer;line-height:1;overflow:hidden}
 #board .pc{font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Apple Symbols",
  "DejaVu Sans",serif;font-variant-emoji:text}
 .lt{background:var(--lt)}.dk{background:var(--dk)}
 .sel{outline:3px solid var(--acc);outline-offset:-3px}
-.trg{box-shadow:inset 0 0 0 4px rgba(168,72,42,.35)}
+.trg{box-shadow:inset 0 0 0 4px var(--trg)}
 .pc{pointer-events:none}
 .pz{width:100%;height:100%;display:block;pointer-events:none}
 .w{color:#FBF8F1;text-shadow:0 0 1px #16150F,0 1px 1px rgba(22,21,15,.5)}
@@ -100,6 +124,35 @@ h1{font-family:"Fraunces",Georgia,serif;font-size:24px;margin:0 0 3px;font-weigh
 .rvoce .rdet{grid-column:1/-1;font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
 .rvoce .rdet b{color:var(--ink)}
 
+/* nomi cliccabili e schede */
+.lnk{font:inherit;color:inherit;background:none;border:0;padding:0;min-height:0;border-radius:3px;
+ cursor:pointer;text-align:left;text-decoration:underline;text-decoration-style:dotted;
+ text-decoration-color:var(--acc);text-underline-offset:3px;text-decoration-thickness:1.5px}
+.lnk:hover{color:var(--acc);border:0}
+.lnk:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#scheda{border:1px solid var(--line);border-radius:16px;padding:0;background:var(--card);color:var(--ink);
+ width:min(560px,calc(100vw - 32px));max-height:min(80vh,720px)}
+#scheda::backdrop{background:var(--velo)}
+#scheda .sk-in{display:flex;flex-direction:column;max-height:min(80vh,720px)}
+#schedaCorpo{overflow-y:auto;padding:18px 20px 6px}
+#scheda .sk-fondo{display:flex;justify-content:space-between;align-items:center;gap:10px;
+ padding:10px 20px 14px;border-top:1px solid var(--line)}
+#scheda .sk-fondo span{font-size:11px;color:var(--mut)}
+.sk-sopra{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--mut)}
+.sk-sopra .eco{margin-left:8px}
+.sk-tit{font-family:var(--f-tit);font-size:22px;font-weight:600;margin:4px 0 0;letter-spacing:-.2px}
+.sk-orig{font-size:12px;color:var(--mut);margin-top:2px}
+.sk-nota{font-size:12.5px;color:var(--mut);margin-top:10px;background:var(--soft);border-radius:8px;padding:7px 10px}
+.sk-mosse{margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums;font-weight:600}
+.sk-idea{font-size:14.5px;line-height:1.6;margin:10px 0 0}
+.sk-piani .pl{font-size:13.5px;margin-top:10px;line-height:1.5;display:flex;gap:8px;align-items:baseline}
+.sk-piani .q{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-radius:5px;padding:2px 6px;flex:0 0 auto}
+.sk-piani .q.b{background:var(--soft);color:var(--mut)}
+.sk-piani .q.n{background:var(--ink);color:var(--bg)}
+.sk-att{margin:14px 0 10px;font-size:13.5px;line-height:1.5;border-radius:10px;padding:10px 12px;
+ background:var(--ko-bg);border:1px solid var(--ko-bd);color:var(--ko-tx)}
+.sk-att.ric{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--ok-tx)}
+
 .ultima{min-height:24px;margin-top:13px;font-size:14px}
 .ultima b{font-weight:600}
 .ultima .pc2{font-size:12px;color:var(--mut);margin-left:6px}
@@ -141,23 +194,23 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .trat{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
 .trat span{font-size:11px;background:var(--soft);color:var(--mut);border-radius:5px;padding:3px 7px}
 
-.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px 16px;margin-bottom:10px}
-.card.div{border-color:#D9C8B6}
-.card.pericolo{border-color:#E8C3B2}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;margin-bottom:10px}
+.card.div{border-color:var(--div-bd)}
+.card.pericolo{border-color:var(--ko-bd)}
 .allarme,.occasione{font-weight:600;font-size:13px;border-radius:9px;padding:8px 11px;margin-bottom:11px}
-.allarme{background:#FDF0EA;border:1px solid #E8C3B2;color:#8A3418}
-.occasione{background:#E6F0EB;border:1px solid #BEDACF;color:#24594F}
+.allarme{background:var(--ko-bg);border:1px solid var(--ko-bd);color:var(--ko-tx)}
+.occasione{background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok-tx)}
 .top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .pre{font-size:12px;color:var(--mut);margin-right:7px}
 .mv{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
 .mv i,.rep i{font-style:normal;margin-right:5px;opacity:.8}
 .tag{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;
- color:#7A5A12;background:#F6ECD2;border-radius:6px;padding:3px 7px;margin-left:8px}
+ color:var(--tag-tx);background:var(--tag-bg);border-radius:6px;padding:3px 7px;margin-left:8px}
 .nums{display:flex;white-space:nowrap}
 .nbox{display:inline-flex;flex-direction:column;align-items:flex-end;margin-left:14px}
 .nlab{font-size:10px;letter-spacing:.3px;text-transform:uppercase;color:var(--mut);margin-bottom:1px}
-.obj{color:var(--mut);font-size:16px;font-variant-numeric:tabular-nums}
-.ev{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.obj{color:var(--mut);font-size:16px;font-variant-numeric:tabular-nums;font-family:var(--f-num)}
+.ev{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;font-family:var(--f-num)}
 .apchip{display:inline-block;margin-top:9px;font-size:11.5px;color:var(--mut);
  background:var(--soft);border-radius:6px;padding:4px 8px}
 .replab{font-size:12px;color:var(--mut);margin-top:13px}
@@ -166,8 +219,8 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .rep span{font-size:12px;font-variant-numeric:tabular-nums;background:var(--soft);
  border-radius:6px;padding:4px 8px;color:var(--mut)}
 .rep span b{font-weight:600;color:var(--ink)}
-.rep span.mat{background:#F7DFD6;color:#8A3418}
-.rep span.mat b{color:#8A3418}
+.rep span.mat{background:var(--mat-bg);color:var(--ko-tx)}
+.rep span.mat b{color:var(--ko-tx)}
 .linbtn{margin-top:12px;padding:7px 12px;font-size:13px;min-height:38px;border-radius:9px;color:var(--mut)}
 .lin{margin-top:12px;border-top:1px solid var(--line);padding-top:12px;display:none}
 .lin.on{display:block}
@@ -182,28 +235,25 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .saldo .lab{font-size:12px;color:var(--mut)}
 .saldo .val{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
 .verd{margin-top:11px;padding:10px 12px;border-radius:10px;font-size:13.5px;font-weight:600}
-.verd.win{background:#E6F0EB;border:1px solid #BEDACF;color:#24594F}
-.verd.lose{background:#FDF0EA;border:1px solid #E8C3B2;color:#8A3418}
+.verd.win{background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok-tx)}
+.verd.lose{background:var(--ko-bg);border:1px solid var(--ko-bd);color:var(--ko-tx)}
 .verd.draw{background:var(--soft);border:1px solid var(--line);color:var(--mut)}
 .linnote{font-size:11.5px;color:var(--mut);margin-top:9px;line-height:1.45}
-.avviso{background:#FFF8E8;border:1px solid #E8D9A8;color:#6B5412;border-radius:12px;
+.avviso{background:var(--wa-bg);border:1px solid var(--wa-bd);color:var(--wa-tx);border-radius:12px;
  padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) .avviso{background:#2A2314;border-color:#4A3F1F;color:#D8C48A}
-  :root:not([data-theme="light"]) .allarme{background:#2E1A12;border-color:#5A3524;color:#E8A184}
-  :root:not([data-theme="light"]) .occasione{background:#14271F;border-color:#285043;color:#8FD3BE}
-  :root:not([data-theme="light"]) .verd.win{background:#14271F;border-color:#285043;color:#8FD3BE}
-  :root:not([data-theme="light"]) .verd.lose{background:#2E1A12;border-color:#5A3524;color:#E8A184}
-  :root:not([data-theme="light"]) .rep span.mat{background:#3A2017;color:#E8A184}
-  :root:not([data-theme="light"]) .tag{background:#3A3220;color:#D8C48A}
-  :root:not([data-theme="light"]) .card.div{border-color:#4A3F2C}
-  :root:not([data-theme="light"]) .card.pericolo{border-color:#5A3524}
-}
 </style>
+<link rel="stylesheet" href="css/temi.css">
 </head>
 <body>
 <div class="wrap">
   <div>
+    <div class="temi" id="temi" role="group" aria-label="Tema grafico">
+      <span class="tl">Tema</span>
+      <button data-t="classico">Classico</button>
+      <button data-t="neon">Neon</button>
+      <button data-t="hud">HUD</button>
+      <button data-t="vetro">Vetro</button>
+    </div>
     <h1>Albero delle probabilità</h1>
     <p class="sub" id="mode">Avvio del motore…</p>
     <div class="bwrap"><div id="board"></div><svg id="frecce" viewBox="0 0 8 8" aria-hidden="true"></svg></div>
@@ -248,6 +298,13 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
     <div id="out"><p class="busy">Carico il motore…</p></div>
   </div>
 </div>
+<dialog id="scheda" aria-label="Scheda">
+  <div class="sk-in">
+    <div id="schedaCorpo"></div>
+    <div class="sk-fondo"><span>Testi originali scritti per questo progetto.</span>
+      <form method="dialog"><button>Chiudi</button></form></div>
+  </div>
+</dialog>
 <!-- Diagnostica: uno script classico, cosi' gira anche se i moduli non si caricano.
      Senza questo un errore di caricamento lascia la pagina muta. -->
 <script>
