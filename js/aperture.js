@@ -7,7 +7,13 @@
  */
 let IDX = null;
 
-export async function carica(url = "data/aperture.json") {
+/** Versione dei file, scritta da versione.py in index.html. */
+function versione() {
+  const m = typeof document !== "undefined" && document.querySelector('meta[name="versione"]');
+  return m ? "?v=" + m.content : "";
+}
+
+export async function carica(url = "data/aperture.json" + versione()) {
   if (IDX) return IDX;
   const r = await fetch(url);
   if (!r.ok) throw new Error("aperture.json non trovato");

@@ -855,7 +855,10 @@ avvia().catch((e) => {
   el("mode").textContent = "Avvio fallito";
   el("out").innerHTML =
     `<div class="allarme" style="font-weight:400"><b>Errore all’avvio</b><br><br>${e.message}`
-    + `<br><br>Apri la console (F12) per il dettaglio. Puoi anche ricaricare con `
+    + `<br><br>Se il sito è stato aggiornato da poco, quasi sempre è il browser che mescola `
+    + `file vecchi e nuovi: ricarica con <b>Ctrl+Shift+R</b> (sul telefono chiudi la scheda `
+    + `e riaprila, o prova in navigazione privata).`
+    + `<br><br>Se non basta, apri la console (F12) per il dettaglio. Puoi anche ricaricare con `
     + `<code>?debug</code> in fondo all’indirizzo: stampa in console tutto quello che `
     + `dice il motore.</div>`;
 });

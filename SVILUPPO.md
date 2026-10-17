@@ -73,6 +73,7 @@ js/strutture.js         strutture pedonali di mediogioco
 js/aperture.js          nomi e codici ECO
 js/revisione.js         classifica delle tue mosse (imprecisione / errore / grave)
 js/conteggio.js         conteggio visite ed eventi (GoatCounter, spento finché non lo configuri)
+versione.py             numero di versione dei file, contro la cache dei browser
 js/teoria.js            schede didattiche di aperture e strutture (testi originali)
 css/temi.css            temi grafici alternativi (neon, HUD, vetro)
 js/app.js               interfaccia e orchestrazione
@@ -83,6 +84,21 @@ vendor/                 scaricato da prepara.py, non scritto a mano
 Lo stato vive nel browser: chiunque apra la pagina ha la sua partita e non
 interferisce con gli altri. È il motivo principale per cui la versione web è
 preferibile a quella Python per far provare il prototipo a più persone.
+
+## Aggiornare il sito senza problemi di cache
+
+Ogni file viene caricato con un numero di versione (`js/app.js?v=…`). Se il numero
+non cambia, dopo un aggiornamento il browser, soprattutto sul telefono, può mescolare
+file vecchi in cache con quelli nuovi, e l'avvio fallisce.
+
+Basta installare una volta il hook di git, dalla cartella del repository:
+
+```
+python versione.py --installa
+```
+
+Da lì in poi il numero si aggiorna da solo a ogni commit. Senza hook si può
+lanciare `python versione.py` a mano prima di ogni commit.
 
 ## Contare le visite
 

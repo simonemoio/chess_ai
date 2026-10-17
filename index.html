@@ -247,7 +247,26 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .avviso{background:var(--wa-bg);border:1px solid var(--wa-bd);color:var(--wa-tx);border-radius:12px;
  padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
 </style>
-<link rel="stylesheet" href="css/temi.css">
+<link rel="stylesheet" href="css/temi.css?v=20261018011255">
+<meta name="versione" content="20261018011255">
+<!-- Versione dei file: la aggiorna versione.py a ogni commit. Il numero cambia l'indirizzo
+     di ogni file, cosi' il browser non mescola file vecchi in cache con quelli nuovi. -->
+<script type="importmap">
+{
+  "imports": {
+    "./js/app.js": "./js/app.js?v=20261018011255",
+    "./js/analisi.js": "./js/analisi.js?v=20261018011255",
+    "./js/aperture.js": "./js/aperture.js?v=20261018011255",
+    "./js/avversario.js": "./js/avversario.js?v=20261018011255",
+    "./js/conteggio.js": "./js/conteggio.js?v=20261018011255",
+    "./js/motore.js": "./js/motore.js?v=20261018011255",
+    "./js/revisione.js": "./js/revisione.js?v=20261018011255",
+    "./js/strutture.js": "./js/strutture.js?v=20261018011255",
+    "./js/teoria.js": "./js/teoria.js?v=20261018011255",
+    "./vendor/chess.js": "./vendor/chess.js?v=20261018011255"
+  }
+}
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -365,13 +384,16 @@ setTimeout(function () {
       } else {
         _diag("<b>I file ci sono tutti ma il codice non parte.</b><br><br>"
           + (window.__erroreScript ? "Script in errore: <code>" + window.__erroreScript + "</code><br><br>" : "")
-          + "Apri la console del browser (F12, scheda Console) e guarda il primo errore "
-          + "in rosso: dice quale modulo non si carica.");
+          + "Se il sito è stato aggiornato da poco, quasi sempre è il browser che mescola "
+          + "file vecchi e nuovi: ricarica con <b>Ctrl+Shift+R</b> (sul telefono chiudi la "
+          + "scheda e riaprila, o prova in navigazione privata).<br><br>"
+          + "Se non basta, apri la console del browser (F12, scheda Console) e guarda il primo "
+          + "errore in rosso: dice quale modulo non si carica.");
       }
     });
   });
 }, 4000);
 </script>
-<script type="module" src="js/app.js"></script>
+<script type="module" src="js/app.js?v=20261018011255"></script>
 </body>
 </html>
