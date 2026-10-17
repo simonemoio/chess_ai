@@ -10,6 +10,7 @@ import { albero, linea } from "./analisi.js";
 import { distribuzione, campiona } from "./avversario.js";
 import { carica as caricaAperture, corrente as aperturaCorrente } from "./aperture.js";
 import { analizza as analizzaStrutture } from "./strutture.js";
+import { valutaMossa, CLASSI, uciDi } from "./revisione.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -32,15 +33,34 @@ const S = {
   mio: "w",
   lui: "nero",
   chiavi: [],   // chiavi apertura di ogni posizione attraversata
+  ultimaAnalisi: null,   // {fen, righe}: le schede della posizione corrente
+  revisione: new Map(),  // indice semimossa -> esito di valutaMossa
+  frecceCand: [],        // frecce delle candidate sulla posizione corrente
+  frecce: true,          // mostrarle o no
+  evidenza: null,        // uci della candidata sotto il mouse
+  vista: null,           // {p, frecce, testo}: si sta guardando una posizione passata
 };
+
+// Un colore per candidata, nell'ordine del motore (stabile anche quando le
+// schede vengono riordinate per EV). Scelti per staccare su case chiare e scure.
+const COLORI_CAND = ["#1F7A6B", "#2F64B5", "#B0306A", "#6B3FA0"];
+const VERDE = "#2E8B57", ROSSO = "#C0392B", GRIGIO = "#4A463C";
 
 const elo = () => +el("elo").value;
 const chiave = (fen) => fen.split(" ").slice(0, 3).join(" ");
 
 // ------------------------------------------------------------ scacchiera
 
+/** FEN della posizione dopo `p` semimosse della partita. */
+function fenDopo(p) {
+  if (p <= 0) return new Chess().fen();
+  const h = S.gioco.history({ verbose: true });
+  return h[Math.min(p, h.length) - 1].after;
+}
+
 function disegna() {
-  const righe = S.gioco.fen().split(" ")[0].split("/");
+  const fen = S.vista ? fenDopo(S.vista.p) : S.gioco.fen();
+  const righe = fen.split(" ")[0].split("/");
   const bd = el("board");
   bd.innerHTML = "";
   righe.forEach((riga, r) => {
@@ -50,6 +70,224 @@ function disegna() {
       else casa(bd, r, f++, ch);
     }
   });
+  disegnaFrecce();
+  disegnaVista();
+  disegnaMosse();
+}
+
+// ------------------------------------------------------------ frecce
+
+/** Centro della casa nel sistema 0..8 dello SVG (bianco in basso). */
+function centro(sq) {
+  return ["abcdefgh".indexOf(sq[0]) + 0.5, 8 - +sq[1] + 0.5];
+}
+
+/**
+ * Una freccia da `da` ad `a`. Per il cavallo fa la L, cosi' si capisce che
+ * pezzo muove senza guardare la casa di partenza.
+ */
+function frecciaSvg(da, a, colore, spessore = 0.17, opacita = 0.85) {
+  const [x1, y1] = centro(da);
+  const [x2, y2] = centro(a);
+  const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+  const punti = [[x1, y1]];
+  if ((dx === 1 && dy === 2) || (dx === 2 && dy === 1)) {
+    // prima il lato lungo, poi il corto
+    punti.push(dy > dx ? [x1, y2] : [x2, y1]);
+  }
+  // l'ultimo tratto si accorcia della punta
+  const [px, py] = punti[punti.length - 1];
+  const lx = x2 - px, ly = y2 - py;
+  const L = Math.hypot(lx, ly) || 1;
+  const ux = lx / L, uy = ly / L;
+  const testa = 0.42, largh = spessore * 2.7;
+  const bx = x2 - ux * testa, by = y2 - uy * testa;
+  punti.push([bx, by]);
+
+  const d = punti.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(3) + " " + y.toFixed(3)).join(" ");
+  const nx = -uy, ny = ux;
+  const tri = [[x2 - ux * 0.08, y2 - uy * 0.08],
+               [bx + nx * largh / 2, by + ny * largh / 2],
+               [bx - nx * largh / 2, by - ny * largh / 2]]
+    .map(([x, y]) => x.toFixed(3) + "," + y.toFixed(3)).join(" ");
+  return `<g opacity="${opacita}">`
+    + `<path d="${d}" fill="none" stroke="${colore}" stroke-width="${spessore}" `
+    + `stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<polygon points="${tri}" fill="${colore}"/></g>`;
+}
+
+function disegnaFrecce() {
+  const svg = el("frecce");
+  if (!svg) return;
+  let lista;
+  if (S.vista) lista = S.vista.frecce || [];
+  else if (S.frecce) {
+    lista = S.frecceCand.map((f) => {
+      if (!S.evidenza) return f;
+      return f.uci === S.evidenza
+        ? { ...f, spessore: 0.22, opacita: 0.95 }
+        : { ...f, opacita: 0.18 };
+    });
+  } else lista = [];
+  // le piu' importanti per ultime, cosi' stanno sopra
+  svg.innerHTML = [...lista].reverse()
+    .map((f) => frecciaSvg(f.da, f.a, f.colore, f.spessore, f.opacita)).join("");
+}
+
+function frecceDaRighe(righe) {
+  return righe.map((r) => ({
+    uci: r.uci, da: r.uci.slice(0, 2), a: r.uci.slice(2, 4), colore: r.colore,
+    // la prima del motore un filo piu' spessa
+    spessore: r.colore === COLORI_CAND[0] ? 0.19 : 0.15,
+    opacita: 0.82,
+  })).sort((x, y) => COLORI_CAND.indexOf(x.colore) - COLORI_CAND.indexOf(y.colore));
+}
+
+// ------------------------------------------------------------ vista di una posizione passata
+
+function disegnaVista() {
+  const box = el("vista");
+  if (!S.vista) { box.className = "vista"; box.innerHTML = ""; return; }
+  const n = S.gioco.history().length;
+  box.className = "vista on";
+  box.innerHTML = `<div class="vtxt">${S.vista.testo || testoPosizione(S.vista.p)}</div>`
+    + `<div class="vbtn">`
+    + `<button id="vPrima" ${S.vista.p <= 0 ? "disabled" : ""} aria-label="Mossa precedente">&#9664;</button>`
+    + `<button id="vDopo" ${S.vista.p >= n ? "disabled" : ""} aria-label="Mossa successiva">&#9654;</button>`
+    + `<button id="vTorna">Torna alla partita</button></div>`;
+  el("vPrima").onclick = () => passo(-1);
+  el("vDopo").onclick = () => passo(1);
+  el("vTorna").onclick = () => esciVista();
+}
+
+function etichettaMossa(i, san) {
+  const n = Math.floor(i / 2) + 1;
+  return i % 2 === 0 ? `${n}. ${san}` : `${n}… ${san}`;
+}
+
+function testoPosizione(p) {
+  if (p <= 0) return "Posizione iniziale";
+  const h = S.gioco.history();
+  return `Dopo <b>${etichettaMossa(p - 1, h[p - 1])}</b>`
+    + ` <span class="vmut">&middot; semimossa ${p} di ${h.length}</span>`;
+}
+
+/** Guarda la posizione dopo `p` semimosse; con p = fine si torna alla partita. */
+function vediPosizione(p) {
+  const h = S.gioco.history({ verbose: true });
+  p = Math.max(0, Math.min(p, h.length));
+  if (p === h.length) { esciVista(); return; }
+  const m = p > 0 ? h[p - 1] : null;
+  S.sel = null; S.bersagli = [];
+  S.vista = { p, frecce: m ? [{ da: m.from, a: m.to, colore: GRIGIO, spessore: 0.15, opacita: 0.55 }] : [] };
+  disegna();
+}
+
+function passo(d) {
+  const n = S.gioco.history().length;
+  const p = S.vista ? S.vista.p : n;
+  vediPosizione(p + d);
+}
+
+function esciVista() {
+  if (!S.vista) return;
+  S.vista = null;
+  disegna();
+}
+
+/** Clic su un errore: la posizione prima dell'errore, con la mossa giusta. */
+function vediErrore(i) {
+  const r = S.revisione.get(i);
+  if (!r) return;
+  const c = CLASSI[r.classe];
+  S.sel = null; S.bersagli = [];
+  S.vista = {
+    p: i,
+    frecce: [
+      { da: r.migliore.uci.slice(0, 2), a: r.migliore.uci.slice(2, 4), colore: VERDE, spessore: 0.2, opacita: 0.9 },
+      { da: r.giocata.uci.slice(0, 2), a: r.giocata.uci.slice(2, 4), colore: ROSSO, spessore: 0.14, opacita: 0.7 },
+    ],
+    testo: `Prima di <b>${etichettaMossa(i, r.giocata.san)}${c.simbolo}</b>`
+      + `<div class="vleg"><span><i style="background:${VERDE}"></i>meglio <b>${r.migliore.san}</b> `
+      + `(${fmt(r.migliore.cp, r.migliore.matto)})</span>`
+      + `<span><i style="background:${ROSSO}"></i>hai giocato ${r.giocata.san} `
+      + `(${fmt(r.giocata.cp, r.giocata.matto)})</span></div>`,
+  };
+  disegna();
+  el("board").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+// ------------------------------------------------------------ lista mosse e revisione
+
+function disegnaMosse() {
+  const box = el("mosse");
+  const h = S.gioco.history();
+  if (!h.length) { box.innerHTML = '<span class="vuoto">Nessuna mossa ancora.</span>'; return; }
+  const attiva = S.vista ? S.vista.p - 1 : h.length - 1;
+  let out = "";
+  h.forEach((san, i) => {
+    if (i % 2 === 0) out += `<span class="mnum">${i / 2 + 1}.</span>`;
+    const r = S.revisione.get(i);
+    const cls = "mv1" + (i === attiva ? " att" : "") + (r && r.classe ? " " + r.classe : "");
+    out += `<span class="${cls}" data-p="${i + 1}">${san}`
+      + (r && r.classe ? `<sup>${CLASSI[r.classe].simbolo}</sup>` : "") + "</span>";
+  });
+  box.innerHTML = out;
+  for (const s of box.querySelectorAll(".mv1")) s.onclick = () => vediPosizione(+s.dataset.p);
+  // segui l'ultima mossa senza spostare la pagina
+  const a = box.querySelector(".att");
+  if (a) box.scrollTop = Math.max(0, a.offsetTop - box.offsetTop - box.clientHeight + a.offsetHeight + 8);
+  disegnaRevisione();
+}
+
+const plur = (n, uno, molti) => `${n} ${n === 1 ? uno : molti}`;
+
+function disegnaRevisione() {
+  const box = el("revisione");
+  const voci = [...S.revisione.entries()].sort((a, b) => a[0] - b[0]);
+  if (!voci.length) {
+    box.innerHTML = '<span class="vuoto">Le tue mosse vengono controllate mentre giochi.</span>';
+    return;
+  }
+  const err = voci.filter(([, r]) => r.classe);
+  const conta = (k) => err.filter(([, r]) => r.classe === k).length;
+  let out = `<div class="rsum">`
+    + `<span class="imprecisione">${plur(conta("imprecisione"), "imprecisione", "imprecisioni")}</span>`
+    + `<span class="errore">${plur(conta("errore"), "errore", "errori")}</span>`
+    + `<span class="grave">${plur(conta("grave"), "grave", "gravi")}</span>`
+    + `<span class="ok">${voci.length - err.length} di ${voci.length} senza errori</span></div>`;
+  if (!err.length) out += '<div class="vuoto">Finora nessun errore.</div>';
+  for (const [i, r] of err) {
+    const c = CLASSI[r.classe];
+    out += `<button class="rvoce ${r.classe}" data-i="${i}">`
+      + `<span class="rmv">${etichettaMossa(i, r.giocata.san)}<sup>${c.simbolo}</sup></span>`
+      + `<span class="rcl">${c.nome}</span>`
+      + `<span class="rdet">da ${fmt(r.migliore.cp, r.migliore.matto)} a ${fmt(r.giocata.cp, r.giocata.matto)}`
+      + ` &middot; meglio <b>${r.migliore.san}</b></span></button>`;
+  }
+  box.innerHTML = out;
+  for (const b of box.querySelectorAll(".rvoce")) b.onclick = () => vediErrore(+b.dataset.i);
+}
+
+/**
+ * Valuta in background la mossa appena giocata. Non blocca: il motore e' in
+ * coda, quindi questa valutazione passa prima della risposta dell'avversario.
+ */
+function rivedi(mossa, i) {
+  const fen = mossa.before;
+  const an = S.ultimaAnalisi && S.ultimaAnalisi.fen === fen ? S.ultimaAnalisi.righe : null;
+  valutaMossa(S.motore, fen, uciDi(mossa), an, PROFONDITA).then((r) => {
+    const h = S.gioco.history({ verbose: true });
+    // nel frattempo l'utente puo' essere tornato indietro
+    if (!r || !h[i] || h[i].before !== fen) return;
+    S.revisione.set(i, r);
+    disegnaMosse();
+  }).catch((e) => console.warn("revisione:", e));
+}
+
+function potaRevisione() {
+  const n = S.gioco.history().length;
+  for (const k of [...S.revisione.keys()]) if (k >= n) S.revisione.delete(k);
 }
 
 function casa(bd, r, f, ch) {
@@ -124,6 +362,7 @@ function etichetta(cls, testo, colore) {
 
 async function clicca(sq) {
   if (S.occupato) return;
+  if (S.vista) return;   // posizione passata: solo da guardare
   if (S.sel) {
     const da = S.sel;
     S.sel = null; S.bersagli = [];
@@ -131,6 +370,8 @@ async function clicca(sq) {
     try { fatta = S.gioco.move({ from: da, to: sq, promotion: "q" }); } catch (e) { fatta = null; }
     if (fatta) {
       S.chiavi.push(chiave(S.gioco.fen()));
+      S.frecceCand = []; S.evidenza = null;
+      rivedi(fatta, S.gioco.history().length - 1);
       disegna();
       await dopoMossa();
     } else disegna();
@@ -156,6 +397,7 @@ async function dopoMossa() {
       if (v) {
         S.gioco.move(v.san);
         S.chiavi.push(chiave(S.gioco.fen()));
+        S.vista = null;
         disegna();
         mostraRisposta({ san: v.san, p: Math.round(scelta.p * 1000) / 10,
           nome: nomePezzo(v.piece), glifo: GLIFI[v.piece] });
@@ -245,10 +487,12 @@ function cardHtml(x, lui, e) {
       + `${y.nome} ${y.san} <b>${y.p}%</b>${et}</span>`;
   }).join("");
 
-  return `<div class="card${big ? " div" : ""}${x.matto_contro > 0 ? " pericolo" : ""}">`
+  return `<div class="card${big ? " div" : ""}${x.matto_contro > 0 ? " pericolo" : ""}" data-uci="${x.uci}"`
+    + ` style="border-left:4px solid ${x.colore}">`
     + (x.matto_contro > 0 ? `<div class="allarme">Ti fa matto nel ${x.matto_contro}% delle risposte</div>` : "")
     + (x.matto_pro > 0 ? `<div class="occasione">Gli dai matto nel ${x.matto_pro}% delle risposte</div>` : "")
     + `<div class="top"><span><span class="pre">Se giochi</span>`
+    + `<span class="cdot" style="background:${x.colore}" title="freccia sulla scacchiera"></span>`
     + `<span class="mv"><i>${x.glifo}</i>${x.san}</span>${tag}</span>`
     + `<span class="nums">`
     + `<span class="nbox"><span class="nlab">oggettiva</span>`
@@ -277,11 +521,17 @@ async function analizza() {
   intestazione(io, S.lui, aperturaCorrente(S.chiavi), analizzaStrutture(S.gioco.fen()), e);
   el("out").innerHTML = '<p class="busy">Calcolo…</p>';
 
+  const fen = S.gioco.fen();
+  S.frecceCand = []; S.evidenza = null;
+  disegnaFrecce();
   const parziali = [];
-  const righe = await albero(S.motore, S.gioco.fen(), e, {
+  const righe = await albero(S.motore, fen, e, {
     depth: PROFONDITA,
     suRiga: (r, fatte, totali) => {
+      r.colore = COLORI_CAND[parziali.length % COLORI_CAND.length];
       parziali.push(r);
+      S.frecceCand = frecceDaRighe(parziali);
+      disegnaFrecce();
       // rendering progressivo: la prima scheda compare subito
       el("out").innerHTML = parziali.map((y) => cardHtml(y, S.lui, e)).join("")
         + `<p class="busy">${fatte} di ${totali}…</p>`;
@@ -293,12 +543,20 @@ async function analizza() {
     + `<p class="note">Le righe evidenziate sono quelle dove i due numeri divergono: `
     + `la mossa vale una cosa in assoluto e una cosa diversa contro questo avversario.</p>`;
   aggancia();
+  S.ultimaAnalisi = { fen, righe };
+  S.frecceCand = frecceDaRighe(righe);
+  disegnaFrecce();
   S.occupato = false;
 }
 
 function aggancia() {
   for (const b of document.querySelectorAll(".linbtn")) {
     b.onclick = () => vediLinea(b.dataset.uci);
+  }
+  // passando sopra una scheda, la sua freccia resta in primo piano
+  for (const c of document.querySelectorAll("#out .card[data-uci]")) {
+    c.onmouseenter = () => { S.evidenza = c.dataset.uci; disegnaFrecce(); };
+    c.onmouseleave = () => { S.evidenza = null; disegnaFrecce(); };
   }
 }
 
@@ -356,6 +614,7 @@ function aggiornaLato() {
 async function reset() {
   S.gioco = new Chess();
   S.sel = null; S.bersagli = []; S.chiavi = [];
+  S.revisione = new Map(); S.vista = null; S.frecceCand = []; S.ultimaAnalisi = null;
   disegna(); mostraRisposta(null);
   if (S.auto && S.gioco.turn() !== S.mio) await dopoMossa();
   else await analizza();
@@ -366,6 +625,8 @@ async function indietro() {
   const passi = S.auto && S.gioco.history().length >= 2 ? 2 : 1;
   for (let i = 0; i < passi; i++) { S.gioco.undo(); S.chiavi.pop(); }
   S.sel = null; S.bersagli = [];
+  S.vista = null; S.frecceCand = [];
+  potaRevisione();
   disegna(); mostraRisposta(null);
   await analizza();
 }
@@ -392,6 +653,14 @@ async function avvia() {
     S.auto = el("auto").checked;
     if (S.auto && S.gioco.turn() !== S.mio) await dopoMossa();
   };
+  el("frecceChk").onchange = () => { S.frecce = el("frecceChk").checked; disegnaFrecce(); };
+  // frecce della tastiera: scorrono le mosse della partita
+  document.addEventListener("keydown", (ev) => {
+    if (ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
+    if (ev.key === "ArrowLeft") { passo(-1); ev.preventDefault(); }
+    else if (ev.key === "ArrowRight") { passo(1); ev.preventDefault(); }
+    else if (ev.key === "Escape") esciVista();
+  });
   el("elo").oninput = () => { el("elov").textContent = elo(); };
   el("elo").onchange = async () => { if (!S.occupato) await analizza(); };
 

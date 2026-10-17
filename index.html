@@ -36,7 +36,8 @@ body{
 h1{font-family:"Fraunces",Georgia,serif;font-size:24px;margin:0 0 3px;font-weight:600;letter-spacing:-.3px}
 .sub{color:var(--mut);font-size:13px;margin:0 0 16px}
 
-.bwrap{container-type:inline-size;width:100%;max-width:430px}
+.bwrap{container-type:inline-size;width:100%;max-width:430px;position:relative}
+#frecce{position:absolute;left:0;top:0;width:100%;aspect-ratio:1;pointer-events:none;overflow:visible}
 #board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));
  grid-template-rows:repeat(8,minmax(0,1fr));width:100%;aspect-ratio:1;
  border-radius:10px;overflow:hidden;user-select:none;touch-action:manipulation}
@@ -54,6 +55,48 @@ h1{font-family:"Fraunces",Georgia,serif;font-size:24px;margin:0 0 3px;font-weigh
 .co{position:absolute;font-size:9px;font-size:2.5cqw;font-weight:600;line-height:1;
  opacity:.65;pointer-events:none;font-variant-numeric:tabular-nums}
 .co.cf{right:5%;bottom:3%}.co.cr{left:5%;top:3%}
+
+.cdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;transform:translateY(-1px)}
+
+/* posizione passata */
+.vista{display:none}
+.vista.on{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+ background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);
+ border-radius:11px;padding:8px 10px;margin-top:12px;font-size:13.5px}
+.vista.on + .ultima{display:none}
+.vista .vmut{color:var(--mut);font-size:12px}
+.vista .vbtn{display:flex;gap:6px}
+.vista button{min-height:36px;padding:5px 11px;font-size:13px;border-radius:9px}
+.vleg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;font-size:12px;color:var(--mut)}
+.vleg i{display:inline-block;width:14px;height:4px;border-radius:2px;margin-right:5px;transform:translateY(-2px)}
+.vleg b{color:var(--ink)}
+
+/* lista mosse e revisione */
+.box{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.box h2{font-size:12px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--mut);margin:0 0 7px}
+.box .vuoto{font-size:12.5px;color:var(--mut)}
+#mosse{max-height:150px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:2px 3px;align-items:baseline;
+ font-variant-numeric:tabular-nums;font-size:14px;position:relative}
+#mosse .mnum{color:var(--mut);font-size:12px;margin:0 1px 0 5px}
+#mosse .mnum:first-child{margin-left:0}
+#mosse .mv1{padding:2px 5px;border-radius:6px;cursor:pointer}
+#mosse .mv1:hover{background:var(--soft)}
+#mosse .mv1.att{background:var(--ink);color:var(--bg)}
+#mosse sup{font-size:10px;font-weight:700;margin-left:1px}
+.imprecisione{--cl:#B7861A}.errore{--cl:#D2691E}.grave{--cl:#C0392B}
+#mosse .mv1.imprecisione sup,#mosse .mv1.errore sup,#mosse .mv1.grave sup{color:var(--cl)}
+#mosse .mv1.att sup{color:inherit}
+#revisione{max-height:260px;overflow-y:auto}
+.rsum{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.rsum span{font-size:11px;border-radius:5px;padding:3px 7px;background:var(--soft);color:var(--mut)}
+.rsum span.imprecisione,.rsum span.errore,.rsum span.grave{color:var(--cl);font-weight:600}
+.rvoce{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;width:100%;text-align:left;
+ min-height:0;padding:7px 10px;margin-top:5px;border-radius:9px;border-left:4px solid var(--cl)}
+.rvoce .rmv{font-weight:600;font-variant-numeric:tabular-nums}
+.rvoce .rmv sup{color:var(--cl);font-size:10px;margin-left:1px}
+.rvoce .rcl{color:var(--cl);font-size:12px;font-weight:600;align-self:center}
+.rvoce .rdet{grid-column:1/-1;font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+.rvoce .rdet b{color:var(--ink)}
 
 .ultima{min-height:24px;margin-top:13px;font-size:14px}
 .ultima b{font-weight:600}
@@ -161,7 +204,8 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
   <div>
     <h1>Albero delle probabilità</h1>
     <p class="sub" id="mode">Avvio del motore…</p>
-    <div class="bwrap"><div id="board"></div></div>
+    <div class="bwrap"><div id="board"></div><svg id="frecce" viewBox="0 0 8 8" aria-hidden="true"></svg></div>
+    <div id="vista" class="vista"></div>
     <div id="ultima" class="ultima vuota">Tocca a te.</div>
     <div class="bar">
       <button id="bUndo">Indietro</button>
@@ -175,9 +219,20 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
     </div>
     <div class="bar">
       <label class="chk"><input type="checkbox" id="auto" checked> L’avversario muove da solo</label>
+      <label class="chk"><input type="checkbox" id="frecceChk" checked> Frecce delle candidate</label>
+    </div>
+    <div class="box">
+      <h2>Mosse</h2>
+      <div id="mosse"></div>
+    </div>
+    <div class="box">
+      <h2>Revisione</h2>
+      <div id="revisione"></div>
     </div>
     <p class="note">Clicca un pezzo e poi la casa di arrivo. Dopo ogni mossa la
-      distribuzione si ridisegna: è quello il punto.</p>
+      distribuzione si ridisegna: è quello il punto.
+      Clicca una mossa della lista, o un errore della revisione, per rivedere la
+      posizione; ← e → scorrono la partita.</p>
   </div>
 
   <div>

@@ -23,7 +23,7 @@ export function peso(cp, matto) {
 }
 
 /** Valutazione dal punto di vista di `pov` ('w'|'b'), non di chi muove. */
-async function valPov(motore, fen, pov, depth) {
+export async function valPov(motore, fen, pov, depth) {
   const g = new Chess(fen);
   if (g.isCheckmate()) {
     // chi deve muovere e' matto
