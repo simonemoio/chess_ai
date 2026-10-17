@@ -6,11 +6,12 @@
  */
 import { Chess } from "../vendor/chess.js";
 import { Motore } from "./motore.js";
-import { albero, linea } from "./analisi.js";
+import { albero, linea, peso } from "./analisi.js";
 import { distribuzione, campiona } from "./avversario.js";
 import { carica as caricaAperture, corrente as aperturaCorrente } from "./aperture.js";
 import { analizza as analizzaStrutture } from "./strutture.js";
 import { valutaMossa, CLASSI, uciDi } from "./revisione.js";
+import { avvia as avviaConteggio, evento } from "./conteggio.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -131,11 +132,41 @@ function disegnaFrecce() {
   } else lista = [];
   // le piu' importanti per ultime, cosi' stanno sopra
   svg.innerHTML = [...lista].reverse()
-    .map((f) => frecciaSvg(f.da, f.a, f.colore, f.spessore, f.opacita)).join("");
+    .map((f) => frecciaSvg(f.da, f.a, f.colore, f.spessore, f.opacita)).join("")
+    + bollini(lista);
+}
+
+// Angoli della casa d'arrivo dove mettere il numero: se piu' frecce finiscono
+// nella stessa casa, ognuna prende un angolo diverso.
+const ANGOLI = [[0.27, -0.27], [-0.27, -0.27], [0.27, 0.27], [-0.27, 0.27]];
+
+/** Il numero d'ordine (1 = migliore oggettivamente) vicino alla punta. */
+function bollini(lista) {
+  const usati = {};
+  return lista.filter((f) => f.rango).map((f) => {
+    const k = usati[f.a] = (usati[f.a] || 0) + 1;
+    const [cx, cy] = centro(f.a);
+    const [ox, oy] = ANGOLI[(k - 1) % 4];
+    const x = (cx + ox).toFixed(3), y = (cy + oy).toFixed(3);
+    const op = f.opacita < 0.5 ? 0.35 : 1;
+    return `<g opacity="${op}"><circle cx="${x}" cy="${y}" r="0.19" fill="${f.colore}" `
+      + `stroke="#FBF8F1" stroke-width="0.035"/>`
+      + `<text x="${x}" y="${y}" dy="0.085" text-anchor="middle" font-size="0.25" font-weight="700" `
+      + `fill="#FFFFFF" font-family="Public Sans,system-ui,sans-serif">${f.rango}</text></g>`;
+  }).join("");
+}
+
+/** Ordine per valutazione oggettiva: 1 = la migliore contro il gioco perfetto. */
+function ordina(righe) {
+  const val = (r) => peso(r.oggettiva, r.ogg_matto);
+  const ord = [...righe].sort((a, b) => val(b) - val(a));
+  for (const r of righe) r.rango = ord.indexOf(r) + 1;
 }
 
 function frecceDaRighe(righe) {
+  ordina(righe);
   return righe.map((r) => ({
+    rango: r.rango,
     uci: r.uci, da: r.uci.slice(0, 2), a: r.uci.slice(2, 4), colore: r.colore,
     // la prima del motore un filo piu' spessa
     spessore: r.colore === COLORI_CAND[0] ? 0.19 : 0.15,
@@ -199,6 +230,7 @@ function esciVista() {
 function vediErrore(i) {
   const r = S.revisione.get(i);
   if (!r) return;
+  evento("revisione-errore");
   const c = CLASSI[r.classe];
   S.sel = null; S.bersagli = [];
   S.vista = {
@@ -233,7 +265,9 @@ function disegnaMosse() {
       + (r && r.classe ? `<sup>${CLASSI[r.classe].simbolo}</sup>` : "") + "</span>";
   });
   box.innerHTML = out;
-  for (const s of box.querySelectorAll(".mv1")) s.onclick = () => vediPosizione(+s.dataset.p);
+  for (const s of box.querySelectorAll(".mv1")) {
+    s.onclick = () => { evento("lista-mosse"); vediPosizione(+s.dataset.p); };
+  }
   // segui l'ultima mossa senza spostare la pagina
   const a = box.querySelector(".att");
   if (a) box.scrollTop = Math.max(0, a.offsetTop - box.offsetTop - box.clientHeight + a.offsetHeight + 8);
@@ -372,6 +406,7 @@ async function clicca(sq) {
       S.chiavi.push(chiave(S.gioco.fen()));
       S.frecceCand = []; S.evidenza = null;
       rivedi(fatta, S.gioco.history().length - 1);
+      evento("mossa-giocata");
       disegna();
       await dopoMossa();
     } else disegna();
@@ -465,6 +500,8 @@ function intestazione(io, lui, ap, St, e) {
     + `<div><span class="sw g"></span><span><b>Oggettiva</b> &mdash; quanto vale la mossa contro il gioco perfetto</span></div>`
     + `<div><span class="sw a"></span><span><b>Contro ${e}</b> &mdash; quanto rende davvero contro questo avversario</span></div>`
     + `<div style="opacity:.75">In pedoni, dal punto di vista del ${io}. Più alto = meglio per te.</div>`
+    + `<div><span class="cnum" style="background:var(--mut)">1</span><span>Il numero sulle frecce è l’ordine `
+    + `per valutazione oggettiva: 1 = la migliore. Le schede invece sono ordinate per quanto rendono contro ${e}.</span></div>`
     + `</div>`;
 }
 
@@ -492,7 +529,7 @@ function cardHtml(x, lui, e) {
     + (x.matto_contro > 0 ? `<div class="allarme">Ti fa matto nel ${x.matto_contro}% delle risposte</div>` : "")
     + (x.matto_pro > 0 ? `<div class="occasione">Gli dai matto nel ${x.matto_pro}% delle risposte</div>` : "")
     + `<div class="top"><span><span class="pre">Se giochi</span>`
-    + `<span class="cdot" style="background:${x.colore}" title="freccia sulla scacchiera"></span>`
+    + `<span class="cnum" style="background:${x.colore}" title="${x.rango}ª per valutazione oggettiva">${x.rango || ""}</span>`
     + `<span class="mv"><i>${x.glifo}</i>${x.san}</span>${tag}</span>`
     + `<span class="nums">`
     + `<span class="nbox"><span class="nlab">oggettiva</span>`
@@ -509,6 +546,7 @@ function cardHtml(x, lui, e) {
 
 async function analizza() {
   if (S.gioco.isGameOver()) {
+    evento("partita-finita");
     el("phead").innerHTML = "";
     el("out").innerHTML = '<p class="busy">Partita finita.</p>';
     return;
@@ -564,6 +602,7 @@ async function vediLinea(uci) {
   const box = el("lin_" + uci);
   if (!box) return;
   if (box.classList.contains("on")) { box.classList.remove("on"); return; }
+  evento("come-continua");
   box.classList.add("on");
   box.innerHTML = '<p class="busy">Simulo…</p>';
 
@@ -633,6 +672,7 @@ async function indietro() {
 
 async function avvia() {
   window.__avviato = true;   // spegne la diagnostica in index.html
+  avviaConteggio();
   await caricaPezzi();
   disegna();
   await caricaAperture();
@@ -646,6 +686,7 @@ async function avvia() {
   el("bLato").onclick = async () => {
     if (S.occupato) return;
     S.mio = S.mio === "w" ? "b" : "w";
+    evento("cambio-colore");
     aggiornaLato();
     await reset();
   };
@@ -662,7 +703,10 @@ async function avvia() {
     else if (ev.key === "Escape") esciVista();
   });
   el("elo").oninput = () => { el("elov").textContent = elo(); };
-  el("elo").onchange = async () => { if (!S.occupato) await analizza(); };
+  el("elo").onchange = async () => {
+    evento("cambio-elo");
+    if (!S.occupato) await analizza();
+  };
 
   aggiornaLato();
   await analizza();

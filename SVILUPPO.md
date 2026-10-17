@@ -72,6 +72,7 @@ js/analisi.js           albero delle probabilità e continuazione simulata
 js/strutture.js         strutture pedonali di mediogioco
 js/aperture.js          nomi e codici ECO
 js/revisione.js         classifica delle tue mosse (imprecisione / errore / grave)
+js/conteggio.js         conteggio visite ed eventi (GoatCounter, spento finché non lo configuri)
 js/app.js               interfaccia e orchestrazione
 data/aperture.json      3864 aperture (lichess-org/chess-openings, CC0)
 vendor/                 scaricato da prepara.py, non scritto a mano
@@ -80,6 +81,22 @@ vendor/                 scaricato da prepara.py, non scritto a mano
 Lo stato vive nel browser: chiunque apra la pagina ha la sua partita e non
 interferisce con gli altri. È il motivo principale per cui la versione web è
 preferibile a quella Python per far provare il prototipo a più persone.
+
+## Contare le visite
+
+GitHub Pages non dà statistiche. Il sito usa [GoatCounter](https://www.goatcounter.com):
+gratuito per uso non commerciale, senza cookie e senza dati personali.
+
+1. Crea un account su goatcounter.com e scegli un codice, per esempio `albero-scacchi`.
+2. In `js/conteggio.js` scrivilo in `const CODICE = "albero-scacchi";`.
+3. Commit e push.
+
+Le statistiche sono su `https://albero-scacchi.goatcounter.com`. Oltre alle visite
+conta alcuni eventi, ognuno al massimo una volta per visita, per capire chi
+usa davvero cosa: `mossa-giocata`, `come-continua`, `revisione-errore`,
+`lista-mosse`, `cambio-elo`, `cambio-colore`, `partita-finita`.
+
+Le prove in locale (`localhost`) non vengono contate.
 
 ## Prestazioni misurate
 
