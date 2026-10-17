@@ -153,6 +153,11 @@ h1{font-family:var(--f-tit);font-size:24px;margin:0 0 3px;font-weight:600;letter
  background:var(--ko-bg);border:1px solid var(--ko-bd);color:var(--ko-tx)}
 .sk-att.ric{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--ok-tx)}
 
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-radius:0;min-height:38px;padding:6px 12px;font-size:13px;background:var(--card)}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+#out .card[data-uci]{cursor:pointer}
 .ultima{min-height:24px;margin-top:13px;font-size:14px}
 .ultima b{font-weight:600}
 .ultima .pc2{font-size:12px;color:var(--mut);margin-left:6px}
@@ -271,7 +276,14 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
     </div>
     <div class="bar">
       <label class="chk"><input type="checkbox" id="auto" checked> L’avversario muove da solo</label>
-      <label class="chk"><input type="checkbox" id="frecceChk" checked> Frecce delle candidate</label>
+    </div>
+    <div class="bar">
+      <span style="font-size:13px;color:var(--mut)">Frecce</span>
+      <div class="seg" id="modoFrecce" role="group" aria-label="Frecce delle candidate">
+        <button data-f="sempre" title="Le quattro candidate sempre sulla scacchiera">Sempre</button>
+        <button data-f="richiesta" title="Solo quella della scheda che indichi o tocchi">A richiesta</button>
+        <button data-f="mai" title="Nessuna freccia delle candidate">Mai</button>
+      </div>
     </div>
     <div class="box">
       <h2>Mosse</h2>

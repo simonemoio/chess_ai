@@ -38,8 +38,9 @@ const S = {
   ultimaAnalisi: null,   // {fen, righe}: le schede della posizione corrente
   revisione: new Map(),  // indice semimossa -> esito di valutaMossa
   frecceCand: [],        // frecce delle candidate sulla posizione corrente
-  frecce: true,          // mostrarle o no
-  evidenza: null,        // uci della candidata sotto il mouse
+  frecce: "sempre",      // "sempre" | "richiesta" (solo la scheda indicata) | "mai"
+  evidenza: null,        // uci della candidata sotto il mouse o toccata
+  fissata: false,        // evidenza bloccata da un tocco: resta finche' non si ritocca
   vista: null,           // {p, frecce, testo}: si sta guardando una posizione passata
 };
 
@@ -125,7 +126,11 @@ function disegnaFrecce() {
   if (!svg) return;
   let lista;
   if (S.vista) lista = S.vista.frecce || [];
-  else if (S.frecce) {
+  else if (S.frecce === "richiesta") {
+    // niente suggerimenti finche' non li chiedi: prima pensi, poi guardi
+    lista = S.frecceCand.filter((f) => f.uci === S.evidenza)
+      .map((f) => ({ ...f, spessore: 0.22, opacita: 0.95 }));
+  } else if (S.frecce === "sempre") {
     lista = S.frecceCand.map((f) => {
       if (!S.evidenza) return f;
       return f.uci === S.evidenza
@@ -257,7 +262,11 @@ function vediErrore(i) {
 function disegnaMosse() {
   const box = el("mosse");
   const h = S.gioco.history();
-  if (!h.length) { box.innerHTML = '<span class="vuoto">Nessuna mossa ancora.</span>'; return; }
+  if (!h.length) {
+    box.innerHTML = '<span class="vuoto">Nessuna mossa ancora.</span>';
+    disegnaRevisione();
+    return;
+  }
   const attiva = S.vista ? S.vista.p - 1 : h.length - 1;
   let out = "";
   h.forEach((san, i) => {
@@ -407,7 +416,7 @@ async function clicca(sq) {
     try { fatta = S.gioco.move({ from: da, to: sq, promotion: "q" }); } catch (e) { fatta = null; }
     if (fatta) {
       S.chiavi.push(chiave(S.gioco.fen()));
-      S.frecceCand = []; S.evidenza = null;
+      S.frecceCand = []; S.evidenza = null; S.fissata = false;
       rivedi(fatta, S.gioco.history().length - 1);
       evento("mossa-giocata");
       disegna();
@@ -636,7 +645,7 @@ async function analizza() {
   el("out").innerHTML = '<p class="busy">Calcolo…</p>';
 
   const fen = S.gioco.fen();
-  S.frecceCand = []; S.evidenza = null;
+  S.frecceCand = []; S.evidenza = null; S.fissata = false;
   disegnaFrecce();
   const parziali = [];
   const righe = await albero(S.motore, fen, e, {
@@ -669,8 +678,17 @@ function aggancia() {
   }
   // passando sopra una scheda, la sua freccia resta in primo piano
   for (const c of document.querySelectorAll("#out .card[data-uci]")) {
-    c.onmouseenter = () => { S.evidenza = c.dataset.uci; disegnaFrecce(); };
-    c.onmouseleave = () => { S.evidenza = null; disegnaFrecce(); };
+    c.onmouseenter = () => { if (!S.fissata) { S.evidenza = c.dataset.uci; disegnaFrecce(); } };
+    c.onmouseleave = () => { if (!S.fissata) { S.evidenza = null; disegnaFrecce(); } };
+    // sul telefono non c'e' il mouse: un tocco sulla scheda accende la sua freccia,
+    // un secondo tocco la spegne
+    c.onclick = (ev) => {
+      if (ev.target.closest("button, a")) return;
+      const u = c.dataset.uci;
+      if (S.fissata && S.evidenza === u) { S.fissata = false; S.evidenza = null; }
+      else { S.fissata = true; S.evidenza = u; }
+      disegnaFrecce();
+    };
   }
 }
 
@@ -746,6 +764,28 @@ async function indietro() {
   await analizza();
 }
 
+// ------------------------------------------------------------ frecce: sempre, a richiesta, mai
+
+function impostaFrecce() {
+  try {
+    const v = localStorage.getItem("frecce");
+    if (v === "sempre" || v === "richiesta" || v === "mai") S.frecce = v;
+  } catch (e) { /* si resta su "sempre" */ }
+  const bottoni = document.querySelectorAll("#modoFrecce [data-f]");
+  const segna = () => bottoni.forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.f === S.frecce)));
+  bottoni.forEach((b) => {
+    b.onclick = () => {
+      S.frecce = b.dataset.f;
+      S.fissata = false; S.evidenza = null;
+      try { localStorage.setItem("frecce", S.frecce); } catch (e) { /* va bene lo stesso */ }
+      segna(); disegnaFrecce();
+      evento("frecce-" + S.frecce);
+    };
+  });
+  segna();
+}
+
 // ------------------------------------------------------------ temi grafici
 
 function temaAttivo() { return document.documentElement.dataset.tema || "classico"; }
@@ -792,7 +832,7 @@ async function avvia() {
     if (S.auto && S.gioco.turn() !== S.mio) await dopoMossa();
   };
   impostaTemi();
-  el("frecceChk").onchange = () => { S.frecce = el("frecceChk").checked; disegnaFrecce(); };
+  impostaFrecce();
   // frecce della tastiera: scorrono le mosse della partita
   document.addEventListener("keydown", (ev) => {
     if (ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
