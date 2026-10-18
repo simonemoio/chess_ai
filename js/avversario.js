@@ -1,7 +1,8 @@
 /**
  * Modello giocattolo del giocatore umano, costruito sopra Stockfish.
  *
- * NON e' Maia. Serve a far girare il prototipo senza una rete addestrata.
+ * NON e' il modello addestrato definitivo. Serve a far girare il prototipo
+ * finche' quella rete non c'e'.
  *
  * L'errore di una mossa si misura in PROBABILITA' DI VITTORIA, non in
  * centipawn: perdere 300 cp a +0,5 e' un disastro, a +12 quasi niente. Prima
@@ -26,6 +27,7 @@
  * VEDERE — all'indietro, silenziose, lunghe.
  */
 import { Chess } from "../vendor/chess.js";
+import { minacciate } from "./minacce.js";
 
 /** Probabilita' di vittoria in [0, 1] di chi muove (curva Lichess). */
 export function vittoria(cp) {
@@ -81,6 +83,12 @@ export function difficolta(fen, uci) {
   const dopo = new Chess(fen);
   dopo.move(m.san);
   if (dopo.isCheckmate()) return 0;   // un matto si vede
+
+  // Un pezzo minacciato che si mette in salvo non e' un punto cieco: quando un
+  // pezzo e' in presa e' la prima cosa che si guarda. Senza questa eccezione
+  // le ritirate pagavano la penalita' "indietro + silenziosa" e il bot
+  // preferiva prendere il pezzo offerto, cadendo negli attacchi di scoperta.
+  if (minacciate(fen, g.turn()).includes(m.from)) return 0;
 
   let pen = 0;
   const cattura = m.flags.includes("c") || m.flags.includes("e");
