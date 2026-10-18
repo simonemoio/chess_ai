@@ -90,6 +90,14 @@ export function difficolta(fen, uci) {
   // preferiva prendere il pezzo offerto, cadendo negli attacchi di scoperta.
   if (minacciate(fen, g.turn()).includes(m.from)) return 0;
 
+  // Sotto scacco, "posso mangiare chi mi attacca?" e' la prima domanda che ci
+  // si fa: la cattura del pezzo che da' scacco non e' mai un punto cieco,
+  // nemmeno se e' all'indietro.
+  if (g.inCheck()) {
+    const re = g.board().flat().find((x) => x && x.type === "k" && x.color === g.turn());
+    if (re && g.attackers(re.square, g.turn() === "w" ? "b" : "w").includes(m.to)) return 0;
+  }
+
   let pen = 0;
   const cattura = m.flags.includes("c") || m.flags.includes("e");
   const bianco = g.turn() === "w";

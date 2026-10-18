@@ -16,7 +16,7 @@ import { schedaApertura, schedaStruttura } from "./teoria.js";
 import { pgn, nomeFile, invia } from "./partita.js";
 import * as Diag from "./diagramma.js";
 import { LINEE } from "./linee.js";
-import { minacciate } from "./minacce.js";
+import { minacce } from "./minacce.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -47,8 +47,8 @@ const S = {
   evidenza: null,        // uci della candidata sotto il mouse o toccata
   fissata: false,        // evidenza bloccata da un tocco: resta finche' non si ritocca
   vista: null,           // {p, frecce, testo}: si sta guardando una posizione passata
-  minacce: false,        // opzione: case rosse sotto i tuoi pezzi in presa
-  caseMinacciate: [],    // calcolate a ogni disegno
+  minacce: false,        // opzione: case colorate sotto i tuoi pezzi attaccati
+  caseMinacciate: { rosse: [], arancio: [] },   // calcolate a ogni disegno
 };
 
 // Un colore per candidata, nell'ordine del motore (stabile anche quando le
@@ -72,7 +72,7 @@ function fenDopo(p) {
 function disegna() {
   const fen = S.vista ? fenDopo(S.vista.p) : S.gioco.fen();
   const righe = fen.split(" ")[0].split("/");
-  S.caseMinacciate = S.minacce ? minacciate(fen, S.mio) : [];
+  S.caseMinacciate = S.minacce ? minacce(fen, S.mio) : { rosse: [], arancio: [] };
   const bd = el("board");
   bd.innerHTML = "";
   righe.forEach((riga, r) => {
@@ -352,13 +352,27 @@ function casa(bd, r, f, ch) {
   d.className = (chiara ? "lt" : "dk")
     + (S.sel === nome ? " sel" : "")
     + (S.bersagli.includes(nome) ? " trg" : "")
-    + (S.caseMinacciate.includes(nome) ? " mn" : "");
+    + (S.caseMinacciate.rosse.includes(nome) ? " mn"
+      : S.caseMinacciate.arancio.includes(nome) ? " mn-sc" : "");
   if (ch) d.appendChild(pezzo(ch));
   const col = chiara ? "var(--co-lt)" : "var(--co-dk)";
   if (r === 7) d.appendChild(etichetta("co cf", "abcdefgh"[f], col));
   if (f === 0) d.appendChild(etichetta("co cr", String(8 - r), col));
   d.addEventListener("click", () => clicca(nome));
   bd.appendChild(d);
+}
+
+/**
+ * Icona di un pezzo dentro il testo (schede, ultima mossa), nel colore vero di
+ * chi muove. Prima si usavano i glifi pieni U+265x: sul telefono il pedone
+ * diventava un'emoji nera e gli altri restavano sempre scuri.
+ */
+function icona(colore, tipo) {
+  if (!colore || !tipo) return "";
+  if (PEZZI_SVG) {
+    return `<svg class="ico" viewBox="0 0 40 40" aria-hidden="true"><use href="#${colore}${tipo}"/></svg>`;
+  }
+  return `<span class="ico pc ${colore}">${GLIFI[tipo]}</span>`;
 }
 
 /** Un pezzo: SVG se lo sprite c'e', altrimenti il glifo tipografico. */
@@ -458,7 +472,7 @@ async function dopoMossa() {
         S.vista = null;
         disegna();
         mostraRisposta({ san: v.san, p: Math.round(scelta.p * 1000) / 10,
-          nome: nomePezzo(v.piece), glifo: GLIFI[v.piece] });
+          nome: nomePezzo(v.piece), lato: v.color, tipo: v.piece });
       }
     }
     S.occupato = false;
@@ -473,7 +487,7 @@ function mostraRisposta(r) {
   const d = el("ultima");
   if (!r) { d.className = "ultima vuota"; d.textContent = "Tocca a te."; return; }
   d.className = "ultima";
-  d.innerHTML = `Ha giocato <b>${r.glifo} ${r.san}</b>`
+  d.innerHTML = `Ha giocato <b>${icona(r.lato, r.tipo)}${r.san}</b>`
     + `<span class="pc2">${r.nome}, probabilità ${r.p}%</span>`;
 }
 
@@ -689,7 +703,7 @@ function cardHtml(x, lui, e) {
     const et = m ? (y.matto === 0 ? " &middot; matto"
       : y.matto < 0 ? ` &middot; matto in ${Math.abs(y.matto)}`
       : ` &middot; gli dai matto in ${y.matto}`) : "";
-    return `<span${m && y.matto <= 0 ? ' class="mat"' : ""}><i>${y.glifo}</i>`
+    return `<span${m && y.matto <= 0 ? ' class="mat"' : ""}>${icona(y.lato, y.tipo)}`
       + `${y.nome} ${y.san} <b>${y.p}%</b>${et}</span>`;
   }).join("");
 
@@ -701,7 +715,7 @@ function cardHtml(x, lui, e) {
       : x.matto_pro > 0 ? `<div class="occasione">Gli dai matto nel ${x.matto_pro}% delle risposte</div>` : "")
     + `<div class="top"><span><span class="pre">Se giochi</span>`
     + `<span class="cnum" style="background:${x.colore}" title="${x.rango}ª per valutazione oggettiva">${x.rango || ""}</span>`
-    + `<span class="mv"><i>${x.glifo}</i>${x.san}</span>${tag}</span>`
+    + `<span class="mv">${icona(x.lato, x.tipo)}${x.san}</span>${tag}</span>`
     + `<span class="nums">`
     + `<span class="nbox"><span class="nlab">oggettiva</span>`
     + `<span class="obj">${fmt(x.oggettiva, x.ogg_matto)}</span></span>`

@@ -8,6 +8,10 @@
  *   - e' attaccato da un pezzo che vale meno di lui (prenderlo conviene
  *     anche se poi si viene ripresi).
  * Il re e' minacciato quando e' sotto scacco.
+ *
+ * minacce() restituisce anche gli altri pezzi attaccati ma difesi, dove al
+ * massimo c'e' uno scambio alla pari o a proprio favore: sulla scacchiera
+ * sono arancioni, i minacciati veri rossi.
  */
 import { Chess } from "../vendor/chess.js";
 
@@ -30,4 +34,20 @@ export function minacciate(fen, colore) {
     if (!difeso || minimo < VALORE[p.type]) out.push(sq);
   }
   return out;
+}
+
+/** Tutti i pezzi attaccati di un colore: {rosse: in presa, arancio: scambio}. */
+export function minacce(fen, colore) {
+  let g;
+  try { g = new Chess(fen); } catch (e) { return { rosse: [], arancio: [] }; }
+  const altro = colore === "w" ? "b" : "w";
+  const rosse = minacciate(fen, colore);
+  const arancio = [];
+  for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) {
+    const sq = f + r;
+    const p = g.get(sq);
+    if (!p || p.color !== colore || rosse.includes(sq)) continue;
+    if (g.attackers(sq, altro).length) arancio.push(sq);
+  }
+  return { rosse, arancio };
 }

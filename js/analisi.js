@@ -64,7 +64,7 @@ function descrivi(fen, uci) {
     (x) => x.lan === uci || x.from + x.to === uci.slice(0, 4)
   );
   if (!m) return null;
-  return { san: m.san, nome: NOMI[m.piece], glifo: GLIFI[m.piece] };
+  return { san: m.san, nome: NOMI[m.piece], glifo: GLIFI[m.piece], lato: m.color, tipo: m.piece };
 }
 
 function chiaveApertura(fen) {
@@ -117,7 +117,7 @@ export async function albero(motore, fen, elo, opt = {}) {
         if (v.matto > 0) pPro += quota; else pContro += quota;
       }
       dettaglio.push({
-        san: dr.san, nome: dr.nome, glifo: dr.glifo,
+        san: dr.san, nome: dr.nome, glifo: dr.glifo, lato: dr.lato, tipo: dr.tipo,
         p: Math.round(r.p * 1000) / 10, cp: v.cp, matto: v.matto,
       });
     }
@@ -126,7 +126,7 @@ export async function albero(motore, fen, elo, opt = {}) {
     if (!dettaglio.length) ev = peso(ogg.cp, ogg.matto);
 
     const riga = {
-      san: d.san, uci: c.uci, nome: d.nome, glifo: d.glifo,
+      san: d.san, uci: c.uci, nome: d.nome, glifo: d.glifo, lato: d.lato, tipo: d.tipo,
       ap: ap ? { eco: ap[0], nome: ap[1] } : null,
       oggettiva: ogg.cp, ogg_matto: ogg.matto,
       ev: Math.round(ev),

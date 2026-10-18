@@ -71,7 +71,10 @@ h1{font-family:var(--f-tit);font-size:24px;margin:0 0 3px;font-weight:600;letter
  "DejaVu Sans",serif;font-variant-emoji:text}
 .lt{background:var(--lt)}.dk{background:var(--dk)}
 .sel{outline:3px solid var(--acc);outline-offset:-3px}
-#board div.mn{box-shadow:inset 0 0 0 100px rgba(214,64,44,.30)}
+#board div.mn{box-shadow:inset 0 0 0 100px rgba(214,64,44,.32)}
+#board div.mn-sc{box-shadow:inset 0 0 0 100px rgba(235,140,30,.42)}
+.ico{width:1.2em;height:1.2em;vertical-align:-0.25em;margin-right:4px;flex:0 0 auto}
+span.ico{width:auto;height:auto;vertical-align:baseline;font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Apple Symbols","DejaVu Sans",serif;font-variant-emoji:text}
 .trg{box-shadow:inset 0 0 0 4px var(--trg)}
 .pc{pointer-events:none}
 .pz{width:100%;height:100%;display:block;pointer-events:none}
@@ -259,27 +262,27 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .avviso{background:var(--wa-bg);border:1px solid var(--wa-bd);color:var(--wa-tx);border-radius:12px;
  padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
 </style>
-<link rel="stylesheet" href="css/temi.css?v=20261018231653">
-<meta name="versione" content="20261018231653">
+<link rel="stylesheet" href="css/temi.css?v=20261019001957">
+<meta name="versione" content="20261019001957">
 <!-- Versione dei file: la aggiorna versione.py a ogni commit. Il numero cambia l'indirizzo
      di ogni file, cosi' il browser non mescola file vecchi in cache con quelli nuovi. -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=20261018231653",
-    "./js/analisi.js": "./js/analisi.js?v=20261018231653",
-    "./js/aperture.js": "./js/aperture.js?v=20261018231653",
-    "./js/avversario.js": "./js/avversario.js?v=20261018231653",
-    "./js/conteggio.js": "./js/conteggio.js?v=20261018231653",
-    "./js/diagramma.js": "./js/diagramma.js?v=20261018231653",
-    "./js/linee.js": "./js/linee.js?v=20261018231653",
-    "./js/minacce.js": "./js/minacce.js?v=20261018231653",
-    "./js/motore.js": "./js/motore.js?v=20261018231653",
-    "./js/partita.js": "./js/partita.js?v=20261018231653",
-    "./js/revisione.js": "./js/revisione.js?v=20261018231653",
-    "./js/strutture.js": "./js/strutture.js?v=20261018231653",
-    "./js/teoria.js": "./js/teoria.js?v=20261018231653",
-    "./vendor/chess.js": "./vendor/chess.js?v=20261018231653"
+    "./js/app.js": "./js/app.js?v=20261019001957",
+    "./js/analisi.js": "./js/analisi.js?v=20261019001957",
+    "./js/aperture.js": "./js/aperture.js?v=20261019001957",
+    "./js/avversario.js": "./js/avversario.js?v=20261019001957",
+    "./js/conteggio.js": "./js/conteggio.js?v=20261019001957",
+    "./js/diagramma.js": "./js/diagramma.js?v=20261019001957",
+    "./js/linee.js": "./js/linee.js?v=20261019001957",
+    "./js/minacce.js": "./js/minacce.js?v=20261019001957",
+    "./js/motore.js": "./js/motore.js?v=20261019001957",
+    "./js/partita.js": "./js/partita.js?v=20261019001957",
+    "./js/revisione.js": "./js/revisione.js?v=20261019001957",
+    "./js/strutture.js": "./js/strutture.js?v=20261019001957",
+    "./js/teoria.js": "./js/teoria.js?v=20261019001957",
+    "./vendor/chess.js": "./vendor/chess.js?v=20261019001957"
   }
 }
 </script>
@@ -312,7 +315,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
     </div>
     <div class="bar">
       <label class="chk"><input type="checkbox" id="auto" checked> L’avversario muove da solo</label>
-      <label class="chk" title="Colora di rosso le case dei tuoi pezzi che possono essere presi senza contropartita"><input type="checkbox" id="minacce"> Pezzi minacciati</label>
+      <label class="chk" title="Rosso: pezzo in presa (indifeso o attaccato da un pezzo che vale meno). Arancione: attaccato ma difeso, al massimo uno scambio."><input type="checkbox" id="minacce"> Pezzi minacciati</label>
     </div>
     <div class="bar">
       <span style="font-size:13px;color:var(--mut)">Frecce</span>
@@ -411,6 +414,6 @@ setTimeout(function () {
   });
 }, 4000);
 </script>
-<script type="module" src="js/app.js?v=20261018231653"></script>
+<script type="module" src="js/app.js?v=20261019001957"></script>
 </body>
 </html>
