@@ -14,10 +14,25 @@ import { analizza as analizzaStrutture } from "./strutture.js";
 
 export const MATTO_PESO = 2000; // quanto vale un matto nell'aritmetica dell'EV
 
-/** Valore numerico per la media pesata: il matto vale molto ma non infinito. */
+/**
+ * Fino a che distanza un matto forzato visto dal motore diventa l'unica
+ * scheda mostrata. Oltre, si tengono le alternative: un matto in 9 e' certo
+ * per Stockfish ma non e' "stai per dare matto", e confrontarlo con le altre
+ * strade resta istruttivo.
+ */
+export const MATTO_UNICO = 5;
+
+/**
+ * Valore numerico per la media pesata: il matto vale molto ma non infinito,
+ * e un matto piu' corto vale piu' di uno lungo (prima valevano tutti uguale,
+ * e un matto in 6 poteva finire davanti a un matto in 1).
+ */
 export function peso(cp, matto) {
   if (matto !== null && matto !== undefined) {
-    return matto > 0 ? MATTO_PESO : -MATTO_PESO;
+    const n = Math.min(Math.abs(matto), 10);
+    // matto = 0: chi ha il punto di vista e' gia' matto
+    if (matto <= 0) return -MATTO_PESO + 10 * n;
+    return MATTO_PESO - 10 * (n - 1);
   }
   return cp === null || cp === undefined ? 0 : cp;
 }
@@ -66,7 +81,11 @@ export async function albero(motore, fen, elo, opt = {}) {
   const base = new Chess(fen);
   const pov = base.turn();
 
-  const cand = await motore.multipv(fen, nCand, depth);
+  let cand = await motore.multipv(fen, nCand, depth);
+  // Matto forzato a portata: e' l'unica mossa da guardare, le altre sono rumore.
+  const matto = cand.length && cand[0].matto !== null && cand[0].matto > 0
+    && cand[0].matto <= MATTO_UNICO ? cand[0].matto : null;
+  if (matto !== null) cand = [cand[0]];
   const righe = [];
 
   for (const c of cand) {
@@ -103,6 +122,9 @@ export async function albero(motore, fen, elo, opt = {}) {
       });
     }
 
+    // nessuna risposta possibile (matto o stallo): l'EV e' la valutazione stessa
+    if (!dettaglio.length) ev = peso(ogg.cp, ogg.matto);
+
     const riga = {
       san: d.san, uci: c.uci, nome: d.nome, glifo: d.glifo,
       ap: ap ? { eco: ap[0], nome: ap[1] } : null,
@@ -111,6 +133,7 @@ export async function albero(motore, fen, elo, opt = {}) {
       divergenza: Math.round(ev - peso(ogg.cp, ogg.matto)),
       matto_contro: Math.round(pContro * 1000) / 10,
       matto_pro: Math.round(pPro * 1000) / 10,
+      matto_forzato: matto,
       risposte: dettaglio,
     };
     righe.push(riga);

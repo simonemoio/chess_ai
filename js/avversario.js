@@ -2,47 +2,86 @@
  * Modello giocattolo del giocatore umano, costruito sopra Stockfish.
  *
  * NON e' Maia. Serve a far girare il prototipo senza una rete addestrata.
- * L'idea: piu' l'Elo e' basso, piu' la distribuzione e' piatta; e certe mosse
- * sono meno probabili non perche' siano cattive ma perche' sono difficili da
- * VEDERE — all'indietro, silenziose, lunghe.
  *
- * Conseguenza nota: le distribuzioni restano piu' piatte e piu' sparse di
- * quelle di un umano vero, e la differenza fra 1100 e 1900 si sente meno di
- * quanto dovrebbe.
+ * L'errore di una mossa si misura in PROBABILITA' DI VITTORIA, non in
+ * centipawn: perdere 300 cp a +0,5 e' un disastro, a +12 quasi niente. Prima
+ * il modello ragionava in centipawn e i matti valevano tutti uguale, e verso
+ * la fine della partita il bot sembrava un altro giocatore:
+ *   - in vantaggio non convertiva (matto in 3 e matto in 9 per lui pari);
+ *   - in svantaggio andava a farsi dare matto in 1 come se niente fosse.
+ * Ora lo stesso livello sbaglia "quanto" in apertura, in mediogioco e in
+ * finale: e' la stessa temperatura applicata alla stessa scala.
+ *
+ * Piu' l'Elo e' basso, piu' la distribuzione e' piatta; e certe mosse sono
+ * meno probabili non perche' siano cattive ma perche' sono difficili da
+ * VEDERE — all'indietro, silenziose, lunghe.
  */
 import { Chess } from "../vendor/chess.js";
 
-export function temperatura(elo) {
-  // 1100 -> ~140 cp di rumore; 1900 -> ~55
-  return Math.max(40, 260 - 0.108 * elo);
+/** Probabilita' di vittoria in [0, 1] di chi muove (curva Lichess). */
+export function vittoria(cp) {
+  return 1 / (1 + Math.exp(-0.00368208 * cp));
 }
 
-/** Penalita' in centipawn: quanto e' difficile che un umano NOTI questa mossa. */
+// Scala dei matti, sopra/sotto la curva dei centipawn.
+// Il matto in 1 ha un premio a parte: un umano lo vede quasi sempre, e
+// mancarlo e' l'errore che fa sembrare stupido un bot.
+const PASSO_MATTO = 0.03;   // ogni mossa in piu' per dare matto costa questo
+const PREMIO_MATTO_1 = 0.3; // = soglia di "errore grave" sulla scala Lichess
+
+/**
+ * Utilita' di una candidata per chi muove. Stessa scala per tutte le fasi:
+ * [0, 1] per le posizioni senza matto, sopra 1 se dai matto, sotto 0 se lo
+ * subisci. Matti piu' corti valgono di piu' (per chi li da') e di meno (per
+ * chi li subisce).
+ */
+export function utilita(c) {
+  if (c.matto !== null && c.matto !== undefined) {
+    const n = Math.min(Math.abs(c.matto), 12);
+    const distanza = PASSO_MATTO * (12 - n);
+    if (c.matto > 0) return 1 + distanza + (c.matto === 1 ? PREMIO_MATTO_1 : 0);
+    // matto contro: -1 = l'avversario matta alla mossa dopo
+    return 0 - distanza - (c.matto === -1 ? PREMIO_MATTO_1 : 0);
+  }
+  return vittoria(c.cp ?? 0);
+}
+
+/**
+ * Rumore del livello, sulla scala della probabilita' di vittoria.
+ * Tarata perche' un errore grave (-0,3) resti fra le scelte con peso relativo
+ * ~0,1 a 1100 e ~0,01 a 1900.
+ */
+export function temperatura(elo) {
+  return Math.max(0.04, 0.13 - 0.0000813 * (elo - 1100));
+}
+
+/** Penalita' (stessa scala): quanto e' difficile che un umano NOTI questa mossa. */
 export function difficolta(fen, uci) {
   const g = new Chess(fen);
   const mosse = g.moves({ verbose: true });
   const m = mosse.find((x) => x.lan === uci || x.from + x.to === uci.slice(0, 4));
   if (!m) return 0;
 
+  const dopo = new Chess(fen);
+  dopo.move(m.san);
+  if (dopo.isCheckmate()) return 0;   // un matto si vede
+
   let pen = 0;
   const cattura = m.flags.includes("c") || m.flags.includes("e");
   const bianco = g.turn() === "w";
 
-  if (!cattura) {
-    const dopo = new Chess(fen);
-    dopo.move(m.san);
-    if (!dopo.inCheck()) pen += 35; // mossa silenziosa
-  }
+  if (!cattura && !dopo.inCheck()) pen += 0.025; // mossa silenziosa
 
   const rDa = parseInt(m.from[1], 10);
   const rA = parseInt(m.to[1], 10);
   const indietro = bianco ? rA < rDa : rA > rDa;
-  if (indietro) pen += 55; // blind spot noto sotto i 2000
+  // il re che torna indietro in finale e' normale, non un punto cieco
+  if (indietro && m.piece !== "k") pen += 0.04; // blind spot noto sotto i 2000
 
   if ("brq".includes(m.piece)) {
     const df = Math.abs(m.to.charCodeAt(0) - m.from.charCodeAt(0));
     const dr = Math.abs(rA - rDa);
-    if (Math.max(df, dr) >= 4) pen += 20; // mossa lunga
+    if (Math.max(df, dr) >= 4) pen += 0.015; // mossa lunga
   }
   return pen;
 }
@@ -56,10 +95,10 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10) {
   if (!cand.length) return [];
 
   const t = temperatura(elo);
-  const punteggi = cand.map((c) => {
-    const base = c.matto !== null ? (c.matto > 0 ? 2000 : -2000) : c.cp;
-    return { uci: c.uci, s: (base - difficolta(fen, c.uci)) / t };
-  });
+  const punteggi = cand.map((c) => ({
+    uci: c.uci,
+    s: (utilita(c) - difficolta(fen, c.uci)) / t,
+  }));
 
   const max = Math.max(...punteggi.map((x) => x.s));
   const esp = punteggi.map((x) => ({ uci: x.uci, e: Math.exp(x.s - max) }));

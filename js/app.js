@@ -13,6 +13,7 @@ import { analizza as analizzaStrutture } from "./strutture.js";
 import { valutaMossa, CLASSI, uciDi } from "./revisione.js";
 import { avvia as avviaConteggio, evento } from "./conteggio.js";
 import { schedaApertura, schedaStruttura } from "./teoria.js";
+import { pgn, nomeFile, invia } from "./partita.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -37,6 +38,7 @@ const S = {
   chiavi: [],   // chiavi apertura di ogni posizione attraversata
   ultimaAnalisi: null,   // {fen, righe}: le schede della posizione corrente
   revisione: new Map(),  // indice semimossa -> esito di valutaMossa
+  sceltaBot: new Map(),  // indice semimossa -> {p, elo}: con che probabilita' il bot l'ha scelta
   frecceCand: [],        // frecce delle candidate sulla posizione corrente
   frecce: "sempre",      // "sempre" | "richiesta" (solo la scheda indicata) | "mai"
   evidenza: null,        // uci della candidata sotto il mouse o toccata
@@ -334,6 +336,7 @@ function rivedi(mossa, i) {
 function potaRevisione() {
   const n = S.gioco.history().length;
   for (const k of [...S.revisione.keys()]) if (k >= n) S.revisione.delete(k);
+  for (const k of [...S.sceltaBot.keys()]) if (k >= n) S.sceltaBot.delete(k);
 }
 
 function casa(bd, r, f, ch) {
@@ -443,6 +446,7 @@ async function dopoMossa() {
         (x) => x.lan === scelta.uci || x.from + x.to === scelta.uci.slice(0, 4));
       if (v) {
         S.gioco.move(v.san);
+        S.sceltaBot.set(S.gioco.history().length - 1, { p: scelta.p, elo: elo() });
         S.chiavi.push(chiave(S.gioco.fen()));
         S.vista = null;
         disegna();
@@ -612,7 +616,9 @@ function cardHtml(x, lui, e) {
   return `<div class="card${big ? " div" : ""}${x.matto_contro > 0 ? " pericolo" : ""}" data-uci="${x.uci}"`
     + ` style="border-left:4px solid ${x.colore}">`
     + (x.matto_contro > 0 ? `<div class="allarme">Ti fa matto nel ${x.matto_contro}% delle risposte</div>` : "")
-    + (x.matto_pro > 0 ? `<div class="occasione">Gli dai matto nel ${x.matto_pro}% delle risposte</div>` : "")
+    + (x.matto_forzato
+      ? `<div class="occasione">${x.matto_forzato === 1 ? "Matto in una mossa" : `Matto forzato in ${x.matto_forzato}`}: è l’unica mossa da guardare</div>`
+      : x.matto_pro > 0 ? `<div class="occasione">Gli dai matto nel ${x.matto_pro}% delle risposte</div>` : "")
     + `<div class="top"><span><span class="pre">Se giochi</span>`
     + `<span class="cnum" style="background:${x.colore}" title="${x.rango}ª per valutazione oggettiva">${x.rango || ""}</span>`
     + `<span class="mv"><i>${x.glifo}</i>${x.san}</span>${tag}</span>`
@@ -623,9 +629,11 @@ function cardHtml(x, lui, e) {
     + `<span class="ev" style="color:${x.ev >= 0 ? "var(--acc)" : "var(--cool)"}">${fmtEv(x.ev)}</span></span>`
     + `</span></div>`
     + (x.ap ? `<div class="apchip">porta in <b>${nomeApertura(x.ap.nome, x.ap.eco)}</b><span class="eco">${x.ap.eco}</span></div>` : "")
-    + `<div class="replab">Il ${lui} risponde</div>`
-    + `<div class="pbar">${bars}</div><div class="rep">${reps}</div>`
-    + `<button class="linbtn" data-uci="${x.uci}">Come continua</button>`
+    + (x.risposte.length
+      ? `<div class="replab">Il ${lui} risponde</div>`
+        + `<div class="pbar">${bars}</div><div class="rep">${reps}</div>`
+        + `<button class="linbtn" data-uci="${x.uci}">Come continua</button>`
+      : `<div class="replab">${x.ogg_matto ? "Scacco matto: la partita finisce qui." : "Il " + lui + " non ha mosse."}</div>`)
     + `<div class="lin" id="lin_${x.uci}"></div></div>`;
 }
 
@@ -633,7 +641,9 @@ async function analizza() {
   if (S.gioco.isGameOver()) {
     evento("partita-finita");
     el("phead").innerHTML = "";
-    el("out").innerHTML = '<p class="busy">Partita finita.</p>';
+    el("out").innerHTML = `<p class="busy">Partita finita: ${motivoFine()}.</p>`
+      + `<button id="bInviaFine" class="primario">Invia la partita</button>`;
+    el("bInviaFine").onclick = inviaPartita;
     return;
   }
   S.occupato = true;
@@ -662,9 +672,13 @@ async function analizza() {
     },
   });
 
+  const forzato = righe.length === 1 && righe[0].matto_forzato;
   el("out").innerHTML = righe.map((y) => cardHtml(y, S.lui, e)).join("")
-    + `<p class="note">Le righe evidenziate sono quelle dove i due numeri divergono: `
-    + `la mossa vale una cosa in assoluto e una cosa diversa contro questo avversario.</p>`;
+    + (forzato
+      ? `<p class="note">Il motore ha trovato un matto forzato: qualunque cosa risponda il ${S.lui}, `
+        + `questa linea chiude la partita. Le alternative non contano.</p>`
+      : `<p class="note">Le righe evidenziate sono quelle dove i due numeri divergono: `
+        + `la mossa vale una cosa in assoluto e una cosa diversa contro questo avversario.</p>`);
   aggancia();
   S.ultimaAnalisi = { fen, righe };
   S.frecceCand = frecceDaRighe(righe);
@@ -747,7 +761,7 @@ function aggiornaLato() {
 async function reset() {
   S.gioco = new Chess();
   S.sel = null; S.bersagli = []; S.chiavi = [];
-  S.revisione = new Map(); S.vista = null; S.frecceCand = []; S.ultimaAnalisi = null;
+  S.revisione = new Map(); S.sceltaBot = new Map(); S.vista = null; S.frecceCand = []; S.ultimaAnalisi = null;
   disegna(); mostraRisposta(null);
   if (S.auto && S.gioco.turn() !== S.mio) await dopoMossa();
   else await analizza();
@@ -807,6 +821,63 @@ function impostaTemi() {
   segna();
 }
 
+// ------------------------------------------------------------ esporta la partita
+
+function motivoFine() {
+  const g = S.gioco;
+  if (g.isCheckmate()) return g.turn() === S.mio ? "matto, ha vinto l’avversario" : "matto, hai vinto tu";
+  if (g.isStalemate()) return "stallo";
+  if (g.isThreefoldRepetition()) return "patta per ripetizione";
+  if (g.isInsufficientMaterial()) return "patta per materiale insufficiente";
+  if (g.isDraw()) return "patta (regola delle 50 mosse)";
+  return "in corso";
+}
+
+function risultato() {
+  const g = S.gioco;
+  if (g.isCheckmate()) return g.turn() === "w" ? "0-1" : "1-0";
+  if (g.isDraw()) return "1/2-1/2";
+  return "*";
+}
+
+function testoPgn() {
+  const note = new Map();
+  for (const [i, b] of S.sceltaBot) {
+    note.set(i, `avversario ${b.elo}, probabilità ${Math.round(b.p * 1000) / 10}%`);
+  }
+  for (const [i, r] of S.revisione) {
+    if (!r || !r.classe) continue;
+    const prima = note.get(i);
+    const t = `${CLASSI[r.classe].nome.toLowerCase()}, meglio ${r.migliore.san} `
+      + `(${fmt(r.migliore.cp, r.migliore.matto)} invece di ${fmt(r.giocata.cp, r.giocata.matto)})`;
+    note.set(i, prima ? prima + "; " + t : t);
+  }
+  const avv = `Avversario simulato ${elo()}`;
+  const meta = document.querySelector('meta[name="versione"]');
+  return pgn({
+    mosse: S.gioco.history(),
+    note,
+    risultato: risultato(),
+    finale: S.gioco.isGameOver() ? motivoFine() : null,
+    bianco: S.mio === "w" ? "Tu" : avv,
+    nero: S.mio === "b" ? "Tu" : avv,
+    sito: location.origin + location.pathname,
+    versione: meta ? meta.content : null,
+  });
+}
+
+async function inviaPartita() {
+  if (!S.gioco.history().length) { avviso("Non c’è ancora nessuna mossa da inviare."); return; }
+  evento("invia-partita");
+  const esito = await invia(testoPgn(), nomeFile());
+  if (esito === "scaricata") avviso("Partita scaricata (file .pgn).");
+}
+
+function avviso(t) {
+  const d = el("ultima");
+  d.className = "ultima"; d.textContent = t;
+}
+
 async function avvia() {
   window.__avviato = true;   // spegne la diagnostica in index.html
   avviaConteggio();
@@ -820,6 +891,7 @@ async function avvia() {
 
   el("bUndo").onclick = indietro;
   el("bReset").onclick = reset;
+  el("bInvia").onclick = inviaPartita;
   el("bLato").onclick = async () => {
     if (S.occupato) return;
     S.mio = S.mio === "w" ? "b" : "w";

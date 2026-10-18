@@ -167,6 +167,7 @@ button{font:inherit;padding:9px 14px;border:1px solid var(--line);background:var
  color:var(--ink);border-radius:10px;cursor:pointer;min-height:44px}
 button:hover{border-color:var(--mut)}
 button:disabled{opacity:.5;cursor:default}
+button.primario{background:var(--ink);color:var(--bg);border-color:var(--ink);margin-top:8px}
 input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .chk{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--mut);cursor:pointer;min-height:40px}
 .chk input{width:17px;height:17px;accent-color:var(--cool)}
@@ -247,23 +248,24 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .avviso{background:var(--wa-bg);border:1px solid var(--wa-bd);color:var(--wa-tx);border-radius:12px;
  padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
 </style>
-<link rel="stylesheet" href="css/temi.css?v=20261018011255">
-<meta name="versione" content="20261018011255">
+<link rel="stylesheet" href="css/temi.css?v=20261018144007">
+<meta name="versione" content="20261018144007">
 <!-- Versione dei file: la aggiorna versione.py a ogni commit. Il numero cambia l'indirizzo
      di ogni file, cosi' il browser non mescola file vecchi in cache con quelli nuovi. -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=20261018011255",
-    "./js/analisi.js": "./js/analisi.js?v=20261018011255",
-    "./js/aperture.js": "./js/aperture.js?v=20261018011255",
-    "./js/avversario.js": "./js/avversario.js?v=20261018011255",
-    "./js/conteggio.js": "./js/conteggio.js?v=20261018011255",
-    "./js/motore.js": "./js/motore.js?v=20261018011255",
-    "./js/revisione.js": "./js/revisione.js?v=20261018011255",
-    "./js/strutture.js": "./js/strutture.js?v=20261018011255",
-    "./js/teoria.js": "./js/teoria.js?v=20261018011255",
-    "./vendor/chess.js": "./vendor/chess.js?v=20261018011255"
+    "./js/app.js": "./js/app.js?v=20261018144007",
+    "./js/analisi.js": "./js/analisi.js?v=20261018144007",
+    "./js/aperture.js": "./js/aperture.js?v=20261018144007",
+    "./js/avversario.js": "./js/avversario.js?v=20261018144007",
+    "./js/conteggio.js": "./js/conteggio.js?v=20261018144007",
+    "./js/motore.js": "./js/motore.js?v=20261018144007",
+    "./js/partita.js": "./js/partita.js?v=20261018144007",
+    "./js/revisione.js": "./js/revisione.js?v=20261018144007",
+    "./js/strutture.js": "./js/strutture.js?v=20261018144007",
+    "./js/teoria.js": "./js/teoria.js?v=20261018144007",
+    "./vendor/chess.js": "./vendor/chess.js?v=20261018144007"
   }
 }
 </script>
@@ -287,6 +289,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
       <button id="bUndo">Indietro</button>
       <button id="bReset">Da capo</button>
       <button id="bLato">Gioca col nero</button>
+      <button id="bInvia" title="Scarica la partita in PGN o mandala dal telefono">Invia partita</button>
     </div>
     <div class="bar">
       <span style="font-size:13px;color:var(--mut)">Avversario</span>
@@ -394,6 +397,6 @@ setTimeout(function () {
   });
 }, 4000);
 </script>
-<script type="module" src="js/app.js?v=20261018011255"></script>
+<script type="module" src="js/app.js?v=20261018144007"></script>
 </body>
 </html>
