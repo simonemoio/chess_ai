@@ -14,6 +14,7 @@ import { valutaMossa, CLASSI, uciDi } from "./revisione.js";
 import { avvia as avviaConteggio, evento } from "./conteggio.js";
 import { schedaApertura, schedaStruttura } from "./teoria.js";
 import { pgn, nomeFile, invia } from "./partita.js";
+import * as Diag from "./diagramma.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -527,6 +528,7 @@ function schedaAperturaHtml(nome, eco) {
     + `<div class="sk-orig">${r.chiave}</div>`
     + (r.esatta ? "" : `<div class="sk-nota">Sei in <b>${nome}</b>: qui sotto la scheda della famiglia.</div>`)
     + `<div class="sk-mosse">${x.mosse}</div>`
+    + `<figure class="sk-diag" data-mosse="${encodeURIComponent(x.mosse)}"></figure>`
     + `<p class="sk-idea">${x.idea}</p>`
     + `<div class="sk-piani">${piani(x.bianco, x.nero)}</div>`
     + `<div class="sk-att"><b>Attenzione.</b> ${x.attenzione}</div>`;
@@ -540,6 +542,50 @@ function schedaStrutturaHtml(chiave, nome) {
     + `<p class="sk-idea">${x.spiegazione}</p>`
     + `<div class="sk-piani">${piani(x.bianco, x.nero)}</div>`
     + `<div class="sk-att ric"><b>Da ricordare.</b> ${x.ricorda}</div>`;
+}
+
+/**
+ * Scacchiera dell'apertura dentro la scheda: parte dalla posizione finale,
+ * con i pezzi gia' mossi in evidenza; le frecce scorrono mossa per mossa.
+ */
+function montaDiagramma(box) {
+  const fig = box.querySelector(".sk-diag");
+  if (!fig) return;
+  const r = Diag.ricostruisci(decodeURIComponent(fig.dataset.mosse || ""));
+  if (!r) { fig.remove(); return; }
+  const n = r.mosse.length;
+  const evidenza = Diag.caseCambiate(r.fens[0], r.fens[n]);
+  let i = n;
+
+  const disegnaQui = () => {
+    const m = i ? r.mosse[i - 1] : null;
+    const tav = Diag.svg(r.fens[i], {
+      sprite: PEZZI_SVG, freccia: frecciaSvg,
+      ultima: m ? { from: m.from, to: m.to } : null,
+      evidenza: i === n ? evidenza : null,
+    });
+    const did = i === 0 ? "Posizione di partenza"
+      : i === n ? (r.soloBianco
+        ? "Lo schema completo del bianco. In evidenza i pezzi sviluppati."
+        : `Dopo ${Diag.etichetta(r, n)}: la posizione tipica. In evidenza i pezzi già mossi.`)
+      : `Dopo ${Diag.etichetta(r, i)}`;
+    fig.innerHTML = tav
+      + `<figcaption>`
+      + `<button class="sk-pas" data-d="-1" ${i === 0 ? "disabled" : ""} aria-label="Mossa precedente">&#9664;</button>`
+      + `<span>${did}${r.soloBianco && i === n
+        ? `<small>Le mosse del nero qui non sono fisse: cambiano da partita a partita.</small>` : ""}</span>`
+      + `<button class="sk-pas" data-d="1" ${i === n ? "disabled" : ""} aria-label="Mossa successiva">&#9654;</button>`
+      + `</figcaption>`;
+    for (const b of fig.querySelectorAll(".sk-pas")) {
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        i = Math.max(0, Math.min(n, i + +b.dataset.d));
+        if (i !== n) evento("scheda-diagramma-passo");
+        disegnaQui();
+      };
+    }
+  };
+  disegnaQui();
 }
 
 // un solo ascoltatore per tutta la pagina: i nomi vengono ridisegnati spesso
@@ -557,7 +603,7 @@ document.addEventListener("click", (ev) => {
     h = schedaStrutturaHtml(b.dataset.st, decodeURIComponent(b.dataset.nome || ""));
     evento("scheda-struttura");
   }
-  if (h) apriScheda(h);
+  if (h) { apriScheda(h); montaDiagramma(el("schedaCorpo")); }
 });
 
 function strutHtml(St) {

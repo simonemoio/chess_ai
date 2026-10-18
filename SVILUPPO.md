@@ -73,6 +73,7 @@ js/strutture.js         strutture pedonali di mediogioco
 js/aperture.js          nomi e codici ECO
 js/revisione.js         classifica delle tue mosse (imprecisione / errore / grave)
 js/partita.js           esporta la partita in PGN e la manda col foglio di condivisione
+js/diagramma.js         scacchiera dell'apertura nella scheda didattica, mossa per mossa
 js/conteggio.js         conteggio visite ed eventi (GoatCounter, spento finché non lo configuri)
 versione.py             numero di versione dei file, contro la cache dei browser
 js/teoria.js            schede didattiche di aperture e strutture (testi originali)
