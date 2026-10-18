@@ -15,6 +15,8 @@ import { avvia as avviaConteggio, evento } from "./conteggio.js";
 import { schedaApertura, schedaStruttura } from "./teoria.js";
 import { pgn, nomeFile, invia } from "./partita.js";
 import * as Diag from "./diagramma.js";
+import { LINEE } from "./linee.js";
+import { minacciate } from "./minacce.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -45,6 +47,8 @@ const S = {
   evidenza: null,        // uci della candidata sotto il mouse o toccata
   fissata: false,        // evidenza bloccata da un tocco: resta finche' non si ritocca
   vista: null,           // {p, frecce, testo}: si sta guardando una posizione passata
+  minacce: false,        // opzione: case rosse sotto i tuoi pezzi in presa
+  caseMinacciate: [],    // calcolate a ogni disegno
 };
 
 // Un colore per candidata, nell'ordine del motore (stabile anche quando le
@@ -68,6 +72,7 @@ function fenDopo(p) {
 function disegna() {
   const fen = S.vista ? fenDopo(S.vista.p) : S.gioco.fen();
   const righe = fen.split(" ")[0].split("/");
+  S.caseMinacciate = S.minacce ? minacciate(fen, S.mio) : [];
   const bd = el("board");
   bd.innerHTML = "";
   righe.forEach((riga, r) => {
@@ -346,7 +351,8 @@ function casa(bd, r, f, ch) {
   const chiara = (r + f) % 2 === 0;
   d.className = (chiara ? "lt" : "dk")
     + (S.sel === nome ? " sel" : "")
-    + (S.bersagli.includes(nome) ? " trg" : "");
+    + (S.bersagli.includes(nome) ? " trg" : "")
+    + (S.caseMinacciate.includes(nome) ? " mn" : "");
   if (ch) d.appendChild(pezzo(ch));
   const col = chiara ? "var(--co-lt)" : "var(--co-dk)";
   if (r === 7) d.appendChild(etichetta("co cf", "abcdefgh"[f], col));
@@ -530,6 +536,7 @@ function schedaAperturaHtml(nome, eco) {
     + `<div class="sk-mosse">${x.mosse}</div>`
     + `<figure class="sk-diag" data-mosse="${encodeURIComponent(x.mosse)}"></figure>`
     + `<p class="sk-idea">${x.idea}</p>`
+    + doveporta(r.chiave, x.mosse)
     + `<div class="sk-piani">${piani(x.bianco, x.nero)}</div>`
     + `<div class="sk-att"><b>Attenzione.</b> ${x.attenzione}</div>`;
 }
@@ -544,43 +551,70 @@ function schedaStrutturaHtml(chiave, nome) {
     + `<div class="sk-att ric"><b>Da ricordare.</b> ${x.ricorda}</div>`;
 }
 
+/** "Dove porta": la linea tipica dell'apertura fino al mediogioco. */
+function doveporta(chiave, mosse) {
+  const L = LINEE[chiave];
+  if (!L) return "";
+  const da = Diag.prefisso(Diag.ricostruisci(mosse), Diag.ricostruisci(L.linea));
+  return `<h3 class="sk-sez">Dove porta</h3>`
+    + `<div class="sk-mosse sk-lin">${L.linea}</div>`
+    + `<figure class="sk-diag" data-tipo="meta" data-da="${da}" data-mosse="${encodeURIComponent(L.linea)}"></figure>`
+    + `<p class="sk-meta">${L.meta}</p>`;
+}
+
 /**
- * Scacchiera dell'apertura dentro la scheda: parte dalla posizione finale,
- * con i pezzi gia' mossi in evidenza; le frecce scorrono mossa per mossa.
+ * Scacchiere dentro un riquadro (scheda dell'apertura, "Come continua").
+ * Ogni <figure class="sk-diag"> porta le mosse in data-mosse e, facoltativi,
+ * data-fen0 (posizione di partenza), data-da (prima mossa da mostrare) e
+ * data-tipo ("apertura", "meta", "linea") che decide le didascalie.
+ * Si parte dalla posizione finale, con in evidenza i pezzi che si sono mossi;
+ * i pulsanti scorrono mossa per mossa.
  */
 function montaDiagramma(box) {
-  const fig = box.querySelector(".sk-diag");
-  if (!fig) return;
-  const r = Diag.ricostruisci(decodeURIComponent(fig.dataset.mosse || ""));
+  for (const fig of box.querySelectorAll(".sk-diag")) montaUno(fig);
+}
+
+function montaUno(fig) {
+  const tipo = fig.dataset.tipo || "apertura";
+  const r = Diag.ricostruisci(decodeURIComponent(fig.dataset.mosse || ""), fig.dataset.fen0 || undefined);
   if (!r) { fig.remove(); return; }
   const n = r.mosse.length;
-  const evidenza = Diag.caseCambiate(r.fens[0], r.fens[n]);
+  const da = Math.min(+fig.dataset.da || 0, n);
+  const evidenza = Diag.caseCambiate(r.fens[da], r.fens[n]);
   let i = n;
 
+  const didascalia = () => {
+    if (i === da) {
+      return tipo === "meta" ? "La posizione dell’apertura: da qui parte la linea"
+        : tipo === "linea" ? "La posizione di adesso"
+        : "Posizione di partenza";
+    }
+    if (i < n) return `Dopo ${Diag.etichetta(r, i)}`;
+    if (tipo === "meta") return `Dopo ${Diag.etichetta(r, n)}: la posizione a cui si punta. In evidenza cosa è cambiato rispetto all’apertura.`;
+    if (tipo === "linea") return `Dopo ${Diag.etichetta(r, n)}: dove arriva la linea. In evidenza cosa cambia rispetto a ora.`;
+    return r.soloBianco ? "Lo schema completo del bianco. In evidenza i pezzi sviluppati."
+      : `Dopo ${Diag.etichetta(r, n)}: la posizione tipica. In evidenza i pezzi già mossi.`;
+  };
+
   const disegnaQui = () => {
-    const m = i ? r.mosse[i - 1] : null;
+    const m = i > da ? r.mosse[i - 1] : null;
     const tav = Diag.svg(r.fens[i], {
       sprite: PEZZI_SVG, freccia: frecciaSvg,
       ultima: m ? { from: m.from, to: m.to } : null,
       evidenza: i === n ? evidenza : null,
     });
-    const did = i === 0 ? "Posizione di partenza"
-      : i === n ? (r.soloBianco
-        ? "Lo schema completo del bianco. In evidenza i pezzi sviluppati."
-        : `Dopo ${Diag.etichetta(r, n)}: la posizione tipica. In evidenza i pezzi già mossi.`)
-      : `Dopo ${Diag.etichetta(r, i)}`;
     fig.innerHTML = tav
       + `<figcaption>`
-      + `<button class="sk-pas" data-d="-1" ${i === 0 ? "disabled" : ""} aria-label="Mossa precedente">&#9664;</button>`
-      + `<span>${did}${r.soloBianco && i === n
+      + `<button class="sk-pas" data-d="-1" ${i === da ? "disabled" : ""} aria-label="Mossa precedente">&#9664;</button>`
+      + `<span>${didascalia()}${r.soloBianco && i === n
         ? `<small>Le mosse del nero qui non sono fisse: cambiano da partita a partita.</small>` : ""}</span>`
       + `<button class="sk-pas" data-d="1" ${i === n ? "disabled" : ""} aria-label="Mossa successiva">&#9654;</button>`
       + `</figcaption>`;
     for (const b of fig.querySelectorAll(".sk-pas")) {
       b.onclick = (ev) => {
         ev.stopPropagation();
-        i = Math.max(0, Math.min(n, i + +b.dataset.d));
-        if (i !== n) evento("scheda-diagramma-passo");
+        i = Math.max(da, Math.min(n, i + +b.dataset.d));
+        if (i !== n) evento("diagramma-passo-" + tipo);
         disegnaQui();
       };
     }
@@ -760,7 +794,8 @@ async function vediLinea(uci) {
   box.classList.add("on");
   box.innerHTML = '<p class="busy">Simulo…</p>';
 
-  const L = await linea(S.motore, S.gioco.fen(), elo(), uci, { plies: PLIES, depth: 8 });
+  const fenLinea = S.gioco.fen();
+  const L = await linea(S.motore, fenLinea, elo(), uci, { plies: PLIES, depth: 8 });
 
   let h = '<div class="linrow">';
   L.mosse.forEach((m, i) => {
@@ -795,7 +830,10 @@ async function vediLinea(uci) {
   h += `<div class="linnote">Tu giochi sempre la migliore, il ${S.lui} la più probabile. `
     + `Che risponda esattamente così per tutta la linea: ${p}. Più si va avanti, meno la `
     + `sequenza esatta conta: guarda il motivo, non le mosse.</div>`;
+  h += `<figure class="sk-diag" data-tipo="linea" data-fen0="${fenLinea}" `
+    + `data-mosse="${encodeURIComponent(L.mosse.map((m) => m.san).join(" "))}"></figure>`;
   box.innerHTML = h;
+  montaDiagramma(box);
 }
 
 // ------------------------------------------------------------ comandi
@@ -944,6 +982,14 @@ async function avvia() {
     evento("cambio-colore");
     aggiornaLato();
     await reset();
+  };
+  try { S.minacce = localStorage.getItem("minacce") === "1"; } catch (e) { /* resta spenta */ }
+  el("minacce").checked = S.minacce;
+  el("minacce").onchange = () => {
+    S.minacce = el("minacce").checked;
+    try { localStorage.setItem("minacce", S.minacce ? "1" : ""); } catch (e) { /* va bene lo stesso */ }
+    evento(S.minacce ? "minacce-on" : "minacce-off");
+    disegna();
   };
   el("auto").onchange = async () => {
     S.auto = el("auto").checked;

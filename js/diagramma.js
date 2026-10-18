@@ -30,12 +30,12 @@ function tocca_al_bianco(fen) {
  *   fens[0] e' la posizione iniziale, fens[i] quella dopo la mossa i.
  *   mosse[i-1] e' la mossa (verbose di chess.js) che porta a fens[i].
  */
-export function ricostruisci(testo) {
+export function ricostruisci(testo, fen0) {
   const tk = token(testo || "");
   if (!tk.length) return null;
 
   // 1) sequenza normale, bianco e nero alternati
-  let g = new Chess();
+  let g = fen0 ? new Chess(fen0) : new Chess();
   const fens = [g.fen()], mosse = [];
   for (const t of tk) {
     let m = null;
@@ -43,7 +43,7 @@ export function ricostruisci(testo) {
     if (!m) break;
     mosse.push(m); fens.push(g.fen());
   }
-  if (mosse.length === tk.length) return { fens, mosse, soloBianco: false };
+  if (mosse.length === tk.length || fen0) return mosse.length ? { fens, mosse, soloBianco: false } : null;
 
   // 2) schema del solo bianco
   g = new Chess();
@@ -58,11 +58,19 @@ export function ricostruisci(testo) {
   return mosse.length ? { fens, mosse, soloBianco: false } : null;
 }
 
+/** Quante mosse iniziali di b coincidono con a (per far partire "Dove porta"). */
+export function prefisso(a, b) {
+  if (!a || !b || a.soloBianco) return 0;
+  let k = 0;
+  while (k < a.mosse.length && b.mosse[k] && a.mosse[k].san === b.mosse[k].san) k++;
+  return k;
+}
+
 /** Etichetta della mossa i (1-based): "3.Bc4", "2…Nc6", o "4.Nf3" nello schema. */
 export function etichetta(r, i) {
   const m = r.mosse[i - 1];
   if (r.soloBianco) return `${i}.${m.san}`;
-  const n = Math.ceil(i / 2);
+  const n = r.fens[i - 1].split(" ")[5];   // numero di mossa della posizione di partenza
   return m.color === "w" ? `${n}.${m.san}` : `${n}…${m.san}`;
 }
 

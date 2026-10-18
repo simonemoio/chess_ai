@@ -71,6 +71,7 @@ h1{font-family:var(--f-tit);font-size:24px;margin:0 0 3px;font-weight:600;letter
  "DejaVu Sans",serif;font-variant-emoji:text}
 .lt{background:var(--lt)}.dk{background:var(--dk)}
 .sel{outline:3px solid var(--acc);outline-offset:-3px}
+#board div.mn{box-shadow:inset 0 0 0 100px rgba(214,64,44,.30)}
 .trg{box-shadow:inset 0 0 0 4px var(--trg)}
 .pc{pointer-events:none}
 .pz{width:100%;height:100%;display:block;pointer-events:none}
@@ -145,6 +146,10 @@ h1{font-family:var(--f-tit);font-size:24px;margin:0 0 3px;font-weight:600;letter
 .sk-nota{font-size:12.5px;color:var(--mut);margin-top:10px;background:var(--soft);border-radius:8px;padding:7px 10px}
 .sk-mosse{margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums;font-weight:600}
 .sk-diag{margin:12px auto 0;max-width:300px}
+.sk-sez{margin:20px 0 0;font-size:15px;font-weight:700}
+.sk-lin{margin-top:6px;font-weight:500;font-size:12.5px;line-height:1.5;color:var(--mut)}
+.sk-meta{font-size:14.5px;line-height:1.6;margin:10px 0 0}
+.lin .sk-diag{margin-top:14px}
 .sk-diag .sk-tav{display:block;width:100%;height:auto}
 .sk-diag figcaption{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;color:var(--mut);line-height:1.4}
 .sk-diag figcaption span{flex:1;text-align:center}
@@ -254,25 +259,27 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .avviso{background:var(--wa-bg);border:1px solid var(--wa-bd);color:var(--wa-tx);border-radius:12px;
  padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
 </style>
-<link rel="stylesheet" href="css/temi.css?v=20261018212456">
-<meta name="versione" content="20261018212456">
+<link rel="stylesheet" href="css/temi.css?v=20261018214756">
+<meta name="versione" content="20261018214756">
 <!-- Versione dei file: la aggiorna versione.py a ogni commit. Il numero cambia l'indirizzo
      di ogni file, cosi' il browser non mescola file vecchi in cache con quelli nuovi. -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=20261018212456",
-    "./js/analisi.js": "./js/analisi.js?v=20261018212456",
-    "./js/aperture.js": "./js/aperture.js?v=20261018212456",
-    "./js/avversario.js": "./js/avversario.js?v=20261018212456",
-    "./js/conteggio.js": "./js/conteggio.js?v=20261018212456",
-    "./js/diagramma.js": "./js/diagramma.js?v=20261018212456",
-    "./js/motore.js": "./js/motore.js?v=20261018212456",
-    "./js/partita.js": "./js/partita.js?v=20261018212456",
-    "./js/revisione.js": "./js/revisione.js?v=20261018212456",
-    "./js/strutture.js": "./js/strutture.js?v=20261018212456",
-    "./js/teoria.js": "./js/teoria.js?v=20261018212456",
-    "./vendor/chess.js": "./vendor/chess.js?v=20261018212456"
+    "./js/app.js": "./js/app.js?v=20261018214756",
+    "./js/analisi.js": "./js/analisi.js?v=20261018214756",
+    "./js/aperture.js": "./js/aperture.js?v=20261018214756",
+    "./js/avversario.js": "./js/avversario.js?v=20261018214756",
+    "./js/conteggio.js": "./js/conteggio.js?v=20261018214756",
+    "./js/diagramma.js": "./js/diagramma.js?v=20261018214756",
+    "./js/linee.js": "./js/linee.js?v=20261018214756",
+    "./js/minacce.js": "./js/minacce.js?v=20261018214756",
+    "./js/motore.js": "./js/motore.js?v=20261018214756",
+    "./js/partita.js": "./js/partita.js?v=20261018214756",
+    "./js/revisione.js": "./js/revisione.js?v=20261018214756",
+    "./js/strutture.js": "./js/strutture.js?v=20261018214756",
+    "./js/teoria.js": "./js/teoria.js?v=20261018214756",
+    "./vendor/chess.js": "./vendor/chess.js?v=20261018214756"
   }
 }
 </script>
@@ -305,6 +312,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
     </div>
     <div class="bar">
       <label class="chk"><input type="checkbox" id="auto" checked> L’avversario muove da solo</label>
+      <label class="chk" title="Colora di rosso le case dei tuoi pezzi che possono essere presi senza contropartita"><input type="checkbox" id="minacce"> Pezzi minacciati</label>
     </div>
     <div class="bar">
       <span style="font-size:13px;color:var(--mut)">Frecce</span>
@@ -404,6 +412,6 @@ setTimeout(function () {
   });
 }, 4000);
 </script>
-<script type="module" src="js/app.js?v=20261018212456"></script>
+<script type="module" src="js/app.js?v=20261018214756"></script>
 </body>
 </html>
