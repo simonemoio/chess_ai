@@ -12,6 +12,15 @@
  * Ora lo stesso livello sbaglia "quanto" in apertura, in mediogioco e in
  * finale: e' la stessa temperatura applicata alla stessa scala.
  *
+ * La curva pero' si appiattisce nelle posizioni gia' decise: a -5 perdere un
+ * altro pezzo cambia la probabilita' di vittoria di pochi centesimi, e il bot
+ * sotto di materiale giocava quasi a caso (torri lasciate in presa, pezzi non
+ * ripresi). Un umano invece conta il materiale anche quando sta perdendo.
+ * Per questo le mosse si confrontano con la MIGLIORE candidata: la curva si
+ * applica alla differenza di cp, come se la posizione fosse pari. Lasciare un
+ * pezzo costa lo stesso a 0, a -5 e a +12; la valutazione assoluta conta solo
+ * per i matti.
+ *
  * Piu' l'Elo e' basso, piu' la distribuzione e' piatta; e certe mosse sono
  * meno probabili non perche' siano cattive ma perche' sono difficili da
  * VEDERE — all'indietro, silenziose, lunghe.
@@ -27,7 +36,7 @@ export function vittoria(cp) {
 // Il matto in 1 ha un premio a parte: un umano lo vede quasi sempre, e
 // mancarlo e' l'errore che fa sembrare stupido un bot.
 const PASSO_MATTO = 0.03;   // ogni mossa in piu' per dare matto costa questo
-const PREMIO_MATTO_1 = 0.3; // = soglia di "errore grave" sulla scala Lichess
+const PREMIO_MATTO_1 = 0.3; // = il doppio della soglia di "errore grave" Lichess (0,3 su [-1,1] = 0,15 qui)
 
 /**
  * Utilita' di una candidata per chi muove. Stessa scala per tutte le fasi:
@@ -35,8 +44,13 @@ const PREMIO_MATTO_1 = 0.3; // = soglia di "errore grave" sulla scala Lichess
  * subisci. Matti piu' corti valgono di piu' (per chi li da') e di meno (per
  * chi li subisce).
  */
-export function utilita(c) {
-  if (c.matto !== null && c.matto !== undefined) {
+export function utilita(c, rif = null) {
+  const matto = c.matto !== null && c.matto !== undefined;
+  if (rif !== null && rif !== undefined) {
+    // relativa alla migliore candidata senza matto: quella vale 0,5
+    return matto ? utilita(c) - vittoria(rif) + 0.5 : vittoria((c.cp ?? 0) - rif);
+  }
+  if (matto) {
     const n = Math.min(Math.abs(c.matto), 12);
     const distanza = PASSO_MATTO * (12 - n);
     if (c.matto > 0) return 1 + distanza + (c.matto === 1 ? PREMIO_MATTO_1 : 0);
@@ -47,9 +61,11 @@ export function utilita(c) {
 }
 
 /**
- * Rumore del livello, sulla scala della probabilita' di vittoria.
- * Tarata perche' un errore grave (-0,3) resti fra le scelte con peso relativo
- * ~0,1 a 1100 e ~0,01 a 1900.
+ * Rumore del livello, sulla scala della probabilita' di vittoria in [0, 1].
+ * Attenzione: Lichess misura le "winning chances" in [-1, 1], quindi la sua
+ * soglia di errore grave (0,3) qui vale 0,15. Con questa temperatura una
+ * mossa che perde 0,15 ha peso relativo ~0,3 a 1100, ~0,2 a 1500, ~0,1 a
+ * 1900. Tarata in autoplay sui tassi di errore, non derivata dalla soglia.
  */
 export function temperatura(elo) {
   return Math.max(0.04, 0.13 - 0.0000813 * (elo - 1100));
@@ -95,9 +111,12 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10) {
   if (!cand.length) return [];
 
   const t = temperatura(elo);
+  // riferimento: la migliore candidata senza matto (se sono tutti matti, scala assoluta)
+  const senzaMatto = cand.filter((c) => c.matto === null || c.matto === undefined);
+  const rif = senzaMatto.length ? Math.max(...senzaMatto.map((c) => c.cp ?? 0)) : null;
   const punteggi = cand.map((c) => ({
     uci: c.uci,
-    s: (utilita(c) - difficolta(fen, c.uci)) / t,
+    s: (utilita(c, rif) - difficolta(fen, c.uci)) / t,
   }));
 
   const max = Math.max(...punteggi.map((x) => x.s));
