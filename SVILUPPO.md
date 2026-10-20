@@ -246,20 +246,22 @@ errori fa il bot, non quanto e' forte.
   partite piu' corte (esiti del formato 2), con un fattore fra 0,5 e 2.
 - Il carattere entra anche nell'albero e nella linea simulata.
 
+Due regole tengono lo stile fuori dalle sviste: il bonus si spegne man mano
+che la mossa perde (zero a 0,25 di probabilita' di vittoria), e il materiale
+lasciato conta come "sacrificio" solo entro la tolleranza del motore. Senza,
+l'avventuriero regalava la donna col 17% di probabilita' (2% il neutro).
+
 Taratura: `node prova_stili.mjs` (posizioni in `.dev/`, `--nuove` per
 rigenerarle, `--verifica` per controllare che la formula veloce coincida
 con `distribuzione()`). Per ogni preset trova il moltiplicatore di
-temperatura `t` che riporta la perdita media per mossa a quella del neutro.
-Risultati con PESO 0,14 a 1500 (866 posizioni):
+temperatura `t` che riporta la perdita media per mossa a quella del neutro,
+e controlla che anche la quota di errori gravi (perdita >= 0,15) resti la
+stessa. Risultati con PESO 0,14 a 1500 (866 posizioni):
 
-| stile        | t    | perdita | scacchi | sacrifici |
-|--------------|------|---------|---------|-----------|
-| neutro       | 1    | 3,90    | 5,8%    | 5,6%      |
-| posizionale  | 0,91 | 3,88    | 3,2%    | 3,7%      |
-| prudente     | 1,09 | 3,89    | 6,3%    | 3,5%      |
-| attaccante   | 1    | 3,89    | 9,5%    | 8,9%      |
-| avventuriero | 0,84 | 3,85    | 9,9%    | 13,2%     |
-
-La taratura e' una media su 1100/1500/1900: agli estremi l'Avventuriero e'
-un po' piu' forte del neutro a 1100 (-4% di perdita) e un po' piu' debole a
-1900 (+7%).
+| stile        | t    | perdita | gravi | scacchi | sacrifici |
+|--------------|------|---------|-------|---------|-----------|
+| neutro       | 1    | 3,90    | 4,5%  | 5,8%    | 5,6%      |
+| posizionale  | 0,82 | 3,89    | 4,4%  | 3,4%    | 4,2%      |
+| prudente     | 0,95 | 3,91    | 4,7%  | 6,5%    | 4,3%      |
+| attaccante   | 1,16 | 3,89    | 4,5%  | 8,3%    | 7,6%      |
+| avventuriero | 1,17 | 3,88    | 4,4%  | 7,9%    | 9,4%      |

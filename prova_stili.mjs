@@ -112,10 +112,11 @@ for (const fen of fens) {
   info[fen] = cand.map((c, i) => {
     const m = new Chess(fen).move(c.uci, { strict: false });
     const s = segnali(fen, c.uci, vis[i]);
+    const s0 = segnali(fen, c.uci, 0);
     return {
       uci: c.uci, cp: c.cp ?? 0, matto: c.matto ?? null, rif,
       u: utilita(c, rif), apparente: vis[i] - inev, diff: difficolta(fen, c.uci),
-      sa: s.attacco, sr: s.rischio,
+      sa: s.attacco, sr: s.rischio, sa0: s0.attacco, sr0: s0.rischio,
       perdita: Math.max(0, ub - utilita(c, rif)),
       scacco: m.san.includes("+") || m.san.includes("#"),
       cattura: !!m.captured,
@@ -139,10 +140,13 @@ function dist(fen, k, elo) {
   const t = temperatura(elo) * st.t;
   const toll = TOLLERANZA_SACRIFICIO * Math.max(0, st.rischio) * Math.max(0, st.attacco);
   const sc = info[fen].map((x) => {
+    const uMax = Math.max(...info[fen].map((y) => y.u));
     let u = x.u;
     const sacr = x.rif !== null && x.cp >= x.rif - 50 - toll && x.cp > -300;
     if (x.apparente > 0 && x.matto === null && !sacr) u = Math.min(u, vittoria(-x.apparente));
-    const b = (st.attacco || st.rischio) ? PESO_X * (st.attacco * x.sa + st.rischio * x.sr) : 0;
+    const sa = sacr ? x.sa : x.sa0, sr = sacr ? x.sr : x.sr0;
+    const w = Math.max(0, 1 - (uMax - x.u) / 0.25);
+    const b = (st.attacco || st.rischio) ? w * PESO_X * (st.attacco * sa + st.rischio * sr) : 0;
     return (u - x.diff + b) / t;
   });
   const mx = Math.max(...sc);
@@ -167,11 +171,12 @@ if (process.argv.includes("--verifica")) {
 }
 
 function misura(k, elo) {
-  const tot = { perdita: 0, scacco: 0, cattura: 0, cambio: 0, sacrificio: 0, attacco: 0 };
+  const tot = { perdita: 0, gravi: 0, scacco: 0, cattura: 0, cambio: 0, sacrificio: 0, attacco: 0 };
   for (const fen of fens) {
     const p = dist(fen, k, elo);
     info[fen].forEach((x, i) => {
       tot.perdita += p[i] * x.perdita;
+      tot.gravi += p[i] * (x.perdita >= 0.15 ? 1 : 0); // soglia "errore grave" Lichess
       for (const c of ["scacco", "cattura", "cambio", "sacrificio"]) tot[c] += p[i] * (x[c] ? 1 : 0);
       tot.attacco += p[i] * x.sa;
     });
@@ -195,11 +200,11 @@ for (const k of Object.keys(STILI)) {
 }
 
 const pct = (x) => (x * 100).toFixed(1).padStart(5) + "%";
-console.log("stile          t     Elo  perdita  scacchi catture  cambi  sacrif.  attacco");
+console.log("stile          t     Elo  perdita  gravi  scacchi catture  cambi  sacrif.  attacco");
 for (const k of Object.keys(STILI)) {
   for (const e of ELO) {
     const m = misura(k, e);
-    console.log(`${k.padEnd(13)} ${STILI[k].t.toFixed(2)}  ${e}  ${(m.perdita * 100).toFixed(2).padStart(6)}  `
+    console.log(`${k.padEnd(13)} ${STILI[k].t.toFixed(2)}  ${e}  ${(m.perdita * 100).toFixed(2).padStart(6)} ${pct(m.gravi)}  `
       + `${pct(m.scacco)}  ${pct(m.cattura)} ${pct(m.cambio)} ${pct(m.sacrificio)}  ${m.attacco.toFixed(3).padStart(6)}`);
   }
 }

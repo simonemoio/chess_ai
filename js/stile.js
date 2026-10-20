@@ -17,12 +17,13 @@
 import { Chess } from "../vendor/chess.js";
 
 export const STILI = {
-  // t tarati con prova_stili.mjs (PESO 0,14, 866 posizioni, Elo 1100/1500/1900)
+  // t tarati con prova_stili.mjs (PESO 0,14, 866 posizioni, Elo 1100/1500/1900):
+  // stessa perdita media E stessa quota di errori gravi del neutro
   neutro:       { nome: "Neutro",       attacco: 0,    rischio: 0,    t: 1 },
-  posizionale:  { nome: "Posizionale",  attacco: -1,   rischio: -0.3, t: 0.91 },
-  prudente:     { nome: "Prudente",     attacco: 0,    rischio: -1,   t: 1.09 },
-  attaccante:   { nome: "Attaccante",   attacco: 1,    rischio: 0.3,  t: 1 },
-  avventuriero: { nome: "Avventuriero", attacco: 1,    rischio: 1,    t: 0.84 },
+  posizionale:  { nome: "Posizionale",  attacco: -1,   rischio: -0.3, t: 0.82 },
+  prudente:     { nome: "Prudente",     attacco: 0,    rischio: -1,   t: 0.95 },
+  attaccante:   { nome: "Attaccante",   attacco: 1,    rischio: 0.3,  t: 1.16 },
+  avventuriero: { nome: "Avventuriero", attacco: 1,    rischio: 1,    t: 1.17 },
 };
 
 // Peso dello stile sulla scala dell'utilita' (probabilita' di vittoria).

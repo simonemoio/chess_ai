@@ -177,7 +177,9 @@ export function casaRipresa(ultima) {
   return ultima && (ultima.captured || (ultima.flags || "").includes("e")) ? ultima.to : null;
 }
 
-const PREMIO_RIPRESA = 0.04;   // riprendere e' la mossa piu' ovvia che ci sia
+const PREMIO_RIPRESA = 0.04;
+const FINESTRA_STILE = 0.25;   // oltre questa perdita lo stile non conta piu'
+   // riprendere e' la mossa piu' ovvia che ci sia
 
 /**
  * Distribuzione delle risposte plausibili.
@@ -207,6 +209,8 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10, ripre
   const visibili = cand.map((c) => perditaVisibile(fen, c.uci));
   const inevitabile = Math.min(...visibili);
 
+  const uMax = Math.max(...cand.map((c) => utilita(c, rif)));
+
   const punteggi = cand.map((c, i) => {
     let u = utilita(c, rif);
     // Quanto sembra costare a occhio: se la mossa lascia un pezzo in presa,
@@ -227,7 +231,14 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10, ripre
     if (ripresa && c.uci.slice(2, 4) === ripresa && catturaIn(fen, c.uci)) {
       diff = -PREMIO_RIPRESA;
     }
-    const b = bonusStile(fen, c.uci, visibili[i], stile);
+    // Lo stile sceglie fra mosse plausibili, non fra sviste: il bonus si
+    // spegne man mano che la mossa perde (a 0,25 di probabilita' di vittoria
+    // e' zero). E il materiale lasciato conta come "sacrificio" solo se il
+    // motore lo tollera; altrimenti e' un regalo, non una scelta di stile.
+    // Senza queste due regole l'avventuriero dava la donna per un alfiere col
+    // 17% di probabilita' (2% il neutro).
+    const pesoStile = Math.max(0, 1 - (uMax - utilita(c, rif)) / FINESTRA_STILE);
+    const b = pesoStile * bonusStile(fen, c.uci, sacrificio ? visibili[i] : 0, stile);
     return { uci: c.uci, s: (u - diff + b) / t };
   });
 
