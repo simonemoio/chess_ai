@@ -117,4 +117,55 @@ for (const [nome, fen] of GRATIS) {
   if (!ok) falliti++;
   vero(`  ${ok ? "ok" : "KO"}  ${Math.round(p * 100)}%  ${nome}`);
 }
+
+// Posizione persa: il motore distingue poco tra le mosse, ma regalare la donna
+// a un cavallo (Qd4+?? Nxd4) si vede a occhio. Partita del 19/10, mossa 39.
+vero("\nDONNA IN PRESA (posizione persa, a 1200 si chiede al massimo il 5%)");
+{
+  const fen = "r5k1/4Q3/3PN1pp/3q4/1np5/8/3N2PP/5RK1 b - - 1 39";
+  // Valutazioni fisse, come le ha viste il telefono (Qd4+ in testa per
+  // rumore): con Stockfish vero il risultato cambia da una corsa all'altra.
+  const finto = { multipv: async () => [
+    { uci: "d5d4", cp: -950, matto: null }, { uci: "d5c5", cp: -990, matto: null },
+    { uci: "d5e5", cp: -1000, matto: null }, { uci: "d5e6", cp: -1500, matto: null },
+  ] };
+  const d = await distribuzione(finto, fen, 1200, 8, 10);
+  const p = d.filter((x) => x.uci.slice(0, 4) === "d5d4").reduce((a, x) => a + x.p, 0);
+  const ok = p <= 0.05;
+  if (!ok) falliti++;
+  vero(`  ${ok ? "ok" : "KO"}  ${(p * 100).toFixed(1)}%  Qd4+`);
+}
+
+// La donna attaccata da un pedone si mette in salvo prima di tutto, anche se il
+// motore (posizione persa) vede la mossa di re come la migliore.
+vero("\nDONNA ATTACCATA (posizione persa, a 1200 si chiede almeno l'80% di mosse di donna)");
+{
+  const fen = "4k3/8/8/3q4/2P5/8/8/4K3 b - - 0 1";
+  const finto = { multipv: async () => [
+    { uci: "e8e7", cp: -900, matto: null }, { uci: "e8d7", cp: -920, matto: null },
+    { uci: "d5d4", cp: -950, matto: null }, { uci: "d5c4", cp: -960, matto: null },
+  ] };
+  const d = await distribuzione(finto, fen, 1200, 8, 10);
+  const p = d.filter((x) => x.uci.startsWith("d5")).reduce((a, x) => a + x.p, 0);
+  const ok = p >= 0.8;
+  if (!ok) falliti++;
+  vero(`  ${ok ? "ok" : "KO"}  ${(p * 100).toFixed(1)}%  mosse di donna`);
+}
+
+// Ripresa: a parita' di valutazione, riprendere sulla casa della cattura batte
+// una mossa qualsiasi.
+vero("\nRIPRESA (stessa valutazione, la ripresa deve salire)");
+{
+  const fen = "r1bqkb1r/pppp1ppp/2B2n2/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4";
+  const finto = { multipv: async () => [
+    { uci: "d7c6", cp: 0, matto: null }, { uci: "b7c6", cp: 0, matto: null },
+    { uci: "f6e4", cp: -20, matto: null }, { uci: "d7d6", cp: -60, matto: null },
+  ] };
+  const senza = await distribuzione(finto, fen, 1200, 8, 10);
+  const con = await distribuzione(finto, fen, 1200, 8, 10, "c6");
+  const somma = (d) => d.filter((x) => x.uci.endsWith("c6")).reduce((a, x) => a + x.p, 0);
+  const ok = somma(con) > somma(senza) + 0.05;
+  if (!ok) falliti++;
+  vero(`  ${ok ? "ok" : "KO"}  ${(somma(senza) * 100).toFixed(0)}% -> ${(somma(con) * 100).toFixed(0)}%  riprese in c6`);
+}
 process.exit(falliti ? 1 : 0);

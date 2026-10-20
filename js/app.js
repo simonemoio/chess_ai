@@ -7,10 +7,11 @@
 import { Chess } from "../vendor/chess.js";
 import { Motore } from "./motore.js";
 import { albero, linea, peso } from "./analisi.js";
-import { distribuzione, campiona } from "./avversario.js";
+import { distribuzione, campiona, casaRipresa } from "./avversario.js";
 import { carica as caricaAperture, corrente as aperturaCorrente } from "./aperture.js";
 import { analizza as analizzaStrutture } from "./strutture.js";
 import { valutaMossa, CLASSI, uciDi } from "./revisione.js";
+import { fatti, perche } from "./spiega.js";
 import { avvia as avviaConteggio, evento } from "./conteggio.js";
 import { schedaApertura, schedaStruttura } from "./teoria.js";
 import { pgn, nomeFile, invia } from "./partita.js";
@@ -251,6 +252,7 @@ function vediErrore(i) {
   S.sel = null; S.bersagli = [];
   S.vista = {
     p: i,
+    errore: true,
     frecce: [
       { da: r.migliore.uci.slice(0, 2), a: r.migliore.uci.slice(2, 4), colore: VERDE, spessore: 0.2, opacita: 0.9 },
       { da: r.giocata.uci.slice(0, 2), a: r.giocata.uci.slice(2, 4), colore: ROSSO, spessore: 0.14, opacita: 0.7 },
@@ -259,7 +261,8 @@ function vediErrore(i) {
       + `<div class="vleg"><span><i style="background:${VERDE}"></i>meglio <b>${r.migliore.san}</b> `
       + `(${fmt(r.migliore.cp, r.migliore.matto)})</span>`
       + `<span><i style="background:${ROSSO}"></i>hai giocato ${r.giocata.san} `
-      + `(${fmt(r.giocata.cp, r.giocata.matto)})</span></div>`,
+      + `(${fmt(r.giocata.cp, r.giocata.matto)})</span></div>`
+      + `<p class="vwhy">${r.perche || "Sto cercando il perché…"}</p>`,
   };
   disegna();
   el("board").scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -317,7 +320,8 @@ function disegnaRevisione() {
       + `<span class="rmv">${etichettaMossa(i, r.giocata.san)}<sup>${c.simbolo}</sup></span>`
       + `<span class="rcl">${c.nome}</span>`
       + `<span class="rdet">da ${fmt(r.migliore.cp, r.migliore.matto)} a ${fmt(r.giocata.cp, r.giocata.matto)}`
-      + ` &middot; meglio <b>${r.migliore.san}</b></span></button>`;
+      + ` &middot; meglio <b>${r.migliore.san}</b></span>`
+      + `<span class="rwhy">${r.perche || "Sto cercando il perché…"}</span></button>`;
   }
   box.innerHTML = out;
   for (const b of box.querySelectorAll(".rvoce")) b.onclick = () => vediErrore(+b.dataset.i);
@@ -336,7 +340,27 @@ function rivedi(mossa, i) {
     if (!r || !h[i] || h[i].before !== fen) return;
     S.revisione.set(i, r);
     disegnaMosse();
+    if (r.classe) spiegaErrore(mossa, i, r);
   }).catch((e) => console.warn("revisione:", e));
+}
+
+/**
+ * Il perche' di un errore (js/spiega.js): linee brevi del motore, materiale,
+ * pezzi in presa, forchette. Gira dopo la valutazione, in coda al motore.
+ */
+function spiegaErrore(mossa, i, r) {
+  const h = S.gioco.history({ verbose: true });
+  fatti(S.motore, mossa.before, uciDi(mossa), 10, r, i > 0 ? h[i - 1] : null).then((f) => {
+    const ora = S.gioco.history({ verbose: true });
+    if (!f || !ora[i] || ora[i].before !== mossa.before || S.revisione.get(i) !== r) return;
+    r.perche = perche(f);
+    disegnaMosse();
+    // riquadro dell'errore gia' aperto: aggiorno il testo senza spostare la pagina
+    if (S.vista && S.vista.p === i && S.vista.errore) {
+      S.vista.testo = S.vista.testo.replace("Sto cercando il perché…", r.perche);
+      disegna();
+    }
+  }).catch((e) => console.warn("spiegazione:", e));
 }
 
 function potaRevisione() {
@@ -460,7 +484,8 @@ async function dopoMossa() {
   if (S.auto && !S.gioco.isGameOver() && S.gioco.turn() !== S.mio) {
     S.occupato = true;
     el("out").innerHTML = '<p class="busy">L’avversario pensa…</p>';
-    const dist = await distribuzione(S.motore, S.gioco.fen(), elo(), 4, 10);
+    const dist = await distribuzione(S.motore, S.gioco.fen(), elo(), 4, 10,
+      casaRipresa(S.gioco.history({ verbose: true }).at(-1)));
     if (dist.length) {
       const scelta = campiona(dist);
       const v = S.gioco.moves({ verbose: true }).find(
@@ -472,7 +497,7 @@ async function dopoMossa() {
         S.vista = null;
         disegna();
         mostraRisposta({ san: v.san, p: Math.round(scelta.p * 1000) / 10,
-          nome: nomePezzo(v.piece), lato: v.color, tipo: v.piece });
+          nome: nomePezzo(v.piece), lato: v.color, tipo: v.piece, libro: !!scelta.libro });
       }
     }
     S.occupato = false;
@@ -488,7 +513,8 @@ function mostraRisposta(r) {
   if (!r) { d.className = "ultima vuota"; d.textContent = "Tocca a te."; return; }
   d.className = "ultima";
   d.innerHTML = `Ha giocato <b>${icona(r.lato, r.tipo)}${r.san}</b>`
-    + `<span class="pc2">${r.nome}, probabilità ${r.p}%</span>`;
+    + `<span class="pc2">${r.nome}, probabilità ${r.p}%`
+    + (r.libro ? " · da partite reali di questo livello" : "") + `</span>`;
 }
 
 // ------------------------------------------------------------ pannello
@@ -947,7 +973,8 @@ function testoPgn() {
     if (!r || !r.classe) continue;
     const prima = note.get(i);
     const t = `${CLASSI[r.classe].nome.toLowerCase()}, meglio ${r.migliore.san} `
-      + `(${fmt(r.migliore.cp, r.migliore.matto)} invece di ${fmt(r.giocata.cp, r.giocata.matto)})`;
+      + `(${fmt(r.migliore.cp, r.migliore.matto)} invece di ${fmt(r.giocata.cp, r.giocata.matto)})`
+      + (r.perche ? ". " + r.perche : "");
     note.set(i, prima ? prima + "; " + t : t);
   }
   const avv = `Avversario simulato ${elo()}`;

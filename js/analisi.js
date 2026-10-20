@@ -8,7 +8,7 @@
  * La divergenza fra i due e' il contenuto didattico.
  */
 import { Chess } from "../vendor/chess.js";
-import { distribuzione } from "./avversario.js";
+import { distribuzione, casaRipresa } from "./avversario.js";
 import { cerca as cercaApertura } from "./aperture.js";
 import { analizza as analizzaStrutture } from "./strutture.js";
 
@@ -99,7 +99,8 @@ export async function albero(motore, fen, elo, opt = {}) {
     const ogg = await valPov(motore, fenDopo, pov, depth);
     const ap = cercaApertura(chiaveApertura(fenDopo));
 
-    const risposte = await distribuzione(motore, fenDopo, elo, nRisp, Math.max(8, depth - 2));
+    const risposte = await distribuzione(motore, fenDopo, elo, nRisp, Math.max(8, depth - 2),
+      casaRipresa(g.history({ verbose: true }).at(-1)));
 
     const dettaglio = [];
     let ev = 0, pContro = 0, pPro = 0;
@@ -183,7 +184,8 @@ export async function linea(motore, fen, elo, primaUci, opt = {}) {
       if (!r.length) break;
       uci = r[0].uci;
     } else {
-      const dist = await distribuzione(motore, g.fen(), elo, 1, depth);
+      const dist = await distribuzione(motore, g.fen(), elo, 1, depth,
+        casaRipresa(g.history({ verbose: true }).at(-1)));
       if (!dist.length) break;
       uci = dist[0].uci;
       prob *= dist[0].p;

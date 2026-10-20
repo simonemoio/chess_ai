@@ -28,6 +28,7 @@
  */
 import { Chess } from "../vendor/chess.js";
 import { minacciate } from "./minacce.js";
+import { mosse as mosseLibro } from "./libro.js";
 
 /** Probabilita' di vittoria in [0, 1] di chi muove (curva Lichess). */
 export function vittoria(cp) {
@@ -118,11 +119,76 @@ export function difficolta(fen, uci) {
   return pen;
 }
 
+const VALORE = { p: 100, n: 300, b: 300, r: 500, q: 900, k: 0 };
+
+function catturaIn(fen, uci) {
+  const g = new Chess(fen);
+  const m = g.moves({ verbose: true }).find((x) => x.lan === uci || x.from + x.to === uci.slice(0, 4));
+  return !!(m && (m.captured || m.flags.includes("e")));
+}
+
+/** Materiale che si perde sulla casa sq se il pezzo di `colore` li' e' in presa. */
+function inPresa(g, sq, colore) {
+  const p = g.get(sq);
+  if (!p) return 0;
+  const altro = colore === "w" ? "b" : "w";
+  const attaccanti = g.attackers(sq, altro);
+  if (!attaccanti.length) return 0;
+  const difeso = g.attackers(sq, colore).length > 0;
+  const minimo = Math.min(...attaccanti.map((x) => VALORE[g.get(x).type] || 0));
+  // difeso: si perde la differenza con l'attaccante piu' debole (se e' minore)
+  return difeso ? Math.max(0, VALORE[p.type] - minimo) : VALORE[p.type];
+}
+
+/**
+ * Materiale che la mossa sembra regalare, in centipedoni, a occhio:
+ *  - il pezzo mosso resta in presa (indifeso, o attaccato da un pezzo che vale
+ *    meno) e quello che si cattura non lo ripaga;
+ *  - la donna, ovunque sia, resta in presa: un umano la mette in salvo prima
+ *    di tutto. Non vale sotto scacco (si e' costretti) ne' quando la donna e'
+ *    solo offerta in cambio: attaccata dalla donna avversaria e difesa,
+ *    inPresa() da' zero.
+ * 0 se non regala niente di visibile.
+ */
+export function perditaVisibile(fen, uci) {
+  const g = new Chess(fen);
+  const m = g.moves({ verbose: true }).find((x) => x.lan === uci || x.from + x.to === uci.slice(0, 4));
+  if (!m) return 0;
+  const colore = g.turn();
+  const scacco = g.inCheck();
+  g.move(m.san);
+  if (g.isCheckmate()) return 0;
+  const preso = m.captured ? VALORE[m.captured] : 0;
+
+  let perdita = m.piece === "k" ? 0 : inPresa(g, m.to, colore);
+  if (!scacco) {
+    for (const x of g.board().flat()) {
+      if (x && x.type === "q" && x.color === colore && x.square !== m.to) {
+        perdita = Math.max(perdita, inPresa(g, x.square, colore));
+      }
+    }
+  }
+  return Math.max(0, perdita - preso);
+}
+
+/** Casa della ripresa: dove l'avversario ha appena catturato, se l'ha fatto. */
+export function casaRipresa(ultima) {
+  return ultima && (ultima.captured || (ultima.flags || "").includes("e")) ? ultima.to : null;
+}
+
+const PREMIO_RIPRESA = 0.04;   // riprendere e' la mossa piu' ovvia che ci sia
+
 /**
  * Distribuzione delle risposte plausibili.
- * @returns [{uci, p}] con p normalizzata sulle mosse restituite.
+ * @returns [{uci, p}] con p normalizzata sulle mosse restituite; se la
+ * posizione e' nel libro d'aperture anche {n, libro: true}.
  */
-export async function distribuzione(motore, fen, elo, top = 4, depth = 10) {
+export async function distribuzione(motore, fen, elo, top = 4, depth = 10, ripresa = null) {
+  // In apertura la risposta e' la frequenza osservata a quel livello, non una
+  // stima: si passa al surrogato appena la posizione esce dal libro.
+  const libro = await mosseLibro(fen, elo, top);
+  if (libro) return libro;
+
   const cand = await motore.multipv(fen, 8, depth);
   if (!cand.length) return [];
 
@@ -130,10 +196,33 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10) {
   // riferimento: la migliore candidata senza matto (se sono tutti matti, scala assoluta)
   const senzaMatto = cand.filter((c) => c.matto === null || c.matto === undefined);
   const rif = senzaMatto.length ? Math.max(...senzaMatto.map((c) => c.cp ?? 0)) : null;
-  const punteggi = cand.map((c) => ({
-    uci: c.uci,
-    s: (utilita(c, rif) - difficolta(fen, c.uci)) / t,
-  }));
+  // Perdita "a occhio" di ogni candidata, al netto di quella inevitabile: se
+  // tutte lasciano qualcosa in presa, quel minimo non distingue niente.
+  const visibili = cand.map((c) => perditaVisibile(fen, c.uci));
+  const inevitabile = Math.min(...visibili);
+
+  const punteggi = cand.map((c, i) => {
+    let u = utilita(c, rif);
+    // Quanto sembra costare a occhio: se la mossa lascia un pezzo in presa,
+    // un umano la vede come una perdita di materiale anche quando il motore
+    // non la distingue dalle altre (posizione gia' persa, tutte le mosse
+    // perdono). Resta libero solo il sacrificio che il motore approva e che
+    // non lascia la partita persa: in una posizione persa, a profondita' 10,
+    // "dare la donna" puo' risultare la mossa migliore per rumore, ma nessun
+    // umano la gioca per quello.
+    const apparente = visibili[i] - inevitabile;
+    const cp = c.cp ?? 0;
+    const sacrificio = rif !== null && cp >= rif - 50 && cp > -300;
+    if (apparente > 0 && (c.matto ?? null) === null && !sacrificio) {
+      u = Math.min(u, vittoria(-apparente));
+    }
+    let diff = difficolta(fen, c.uci);
+    // la ripresa sulla casa dove l'avversario ha appena catturato si vede sempre
+    if (ripresa && c.uci.slice(2, 4) === ripresa && catturaIn(fen, c.uci)) {
+      diff = -PREMIO_RIPRESA;
+    }
+    return { uci: c.uci, s: (u - diff) / t };
+  });
 
   const max = Math.max(...punteggi.map((x) => x.s));
   const esp = punteggi.map((x) => ({ uci: x.uci, e: Math.exp(x.s - max) }));

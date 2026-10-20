@@ -75,6 +75,8 @@ js/revisione.js         classifica delle tue mosse (imprecisione / errore / grav
 js/partita.js           esporta la partita in PGN e la manda col foglio di condivisione
 js/diagramma.js         scacchiera dell'apertura nella scheda didattica, mossa per mossa
 js/linee.js             "Dove porta": linea tipica di ogni apertura fino al mediogioco, con commento
+js/libro.js             libro d'aperture per fascia Elo (generato da libro.py)
+js/spiega.js            il perche' degli errori nella revisione (regole su linee del motore e materiale)
 js/minacce.js           pezzi in presa (attaccati e indifesi, o attaccati da un pezzo che vale meno)
 js/conteggio.js         conteggio visite ed eventi (GoatCounter, spento finché non lo configuri)
 versione.py             numero di versione dei file, contro la cache dei browser
@@ -179,3 +181,43 @@ pubblico. Per un prototipo è la scelta più semplice.
 
 Per un prodotto commerciale la questione è aperta e va decisa prima di
 scrivere l'app vera: le opzioni sono nel documento di specifiche.
+
+
+## Libro d'aperture per fascia Elo
+
+Nelle prime semimosse l'avversario non usa il surrogato: gioca le mosse che i
+giocatori Lichess del suo livello giocano davvero in quella posizione,
+campionate per frequenza. I dati stanno in `data/libro-1100.json` …
+`data/libro-1900.json` e si generano una volta sola:
+
+```
+pip install python-chess zstandard
+python libro.py
+```
+
+Lo script legge in streaming il file mensile di Lichess (non lo scarica tutto)
+e si ferma quando ogni fascia ha 60.000 partite. Regole:
+
+- partite rated, standard, blitz o più lente;
+- entrambi i giocatori entro ±100 dal livello (rating Lichess, non FIDE);
+- prime 24 semimosse; una posizione entra se ci arrivano almeno 40 partite;
+  una mossa entra se la gioca almeno il 2%.
+
+Appena la posizione esce dal libro si passa al surrogato su Stockfish. Senza i
+file il sito funziona come prima. I dati sono CC0 e possono stare nel
+repository. Opzioni: `python libro.py --help`.
+
+Prova rapida in node, senza motore: `node prova_libro.mjs`.
+
+## Copertura delle candidate (misura, non fa parte del sito)
+
+L'avversario sceglie solo fra le 8 candidate di Stockfish a profondità 10.
+`copertura.py` misura, per fascia, quante mosse umane cadono fuori da quella
+lista e quanto costano, sulle stesse partite Lichess del libro:
+
+```
+python copertura.py --file lichess-2026-09.pgn.zst --stockfish percorso/stockfish
+```
+
+Scrive `data/copertura.json`. Serve a decidere se il bot deve poter giocare
+anche mosse fuori dalle candidate del motore.
