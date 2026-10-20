@@ -43,16 +43,20 @@ const pulisci = (t) => String(t).replace(/[{}]/g, "");
 export function pgn(o) {
   const parti = [];
   let dopoCommento = false;
+  // il motivo della fine va nello stesso commento dell'ultima mossa: due
+  // commenti di fila sono PGN valido, ma chess.js (e altri lettori) li rifiuta
+  const ultima = o.mosse.length - 1;
   o.mosse.forEach((san, i) => {
     if (i % 2 === 0) parti.push(`${i / 2 + 1}.`);
     // dopo un commento sulla mossa del bianco lo standard ripete il numero: "2..."
     else if (dopoCommento) parti.push(`${(i + 1) / 2}...`);
     parti.push(san);
     dopoCommento = false;
-    const c = o.note && o.note.get(i);
+    let c = o.note && o.note.get(i);
+    if (i === ultima && o.finale) c = c ? `${c}; ${o.finale}` : o.finale;
     if (c) { parti.push(`{${pulisci(c)}}`); dopoCommento = true; }
   });
-  if (o.finale) parti.push(`{${pulisci(o.finale)}}`);
+  if (o.finale && ultima < 0) parti.push(`{${pulisci(o.finale)}}`);
   parti.push(o.risultato);
 
   // righe da 80 caratteri al massimo, come chiede lo standard
