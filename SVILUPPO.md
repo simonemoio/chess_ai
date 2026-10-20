@@ -203,6 +203,12 @@ e si ferma quando ogni fascia ha 60.000 partite. Regole:
 - prime 24 semimosse; una posizione entra se ci arrivano almeno 40 partite;
   una mossa entra se la gioca almeno il 2%.
 
+Per ogni mossa il libro registra anche vittorie, patte e sconfitte (dal punto
+di vista di chi l'ha giocata) e la durata media della partita in semimosse
+(formato 2). Serviranno agli stili dell'avversario: un aggressivo preferisce
+linee con poche patte e partite corte. `js/libro.js` legge anche i file del
+formato 1, che hanno solo i conteggi.
+
 Appena la posizione esce dal libro si passa al surrogato su Stockfish. Senza i
 file il sito funziona come prima. I dati sono CC0 e possono stare nel
 repository. Opzioni: `python libro.py --help`.

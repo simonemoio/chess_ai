@@ -37,7 +37,10 @@ export function carica(elo) {
       try {
         const r = await fetch(`data/libro-${e}.json` + versione());
         if (!r.ok) return null;
-        return (await r.json()).pos;
+        const d = await r.json();
+        // formato 1: [n, uci, conteggio, ...]; formato 2 aggiunge esiti e durata
+        d.pos.passo = d.meta && d.meta.formato >= 2 ? 6 : 2;
+        return d.pos;
       } catch {
         return null;
       }
@@ -48,10 +51,12 @@ export function carica(elo) {
 
 /**
  * Mosse giocate in questa posizione dai giocatori della fascia.
- * @returns [{uci, p, n}] ordinate per frequenza, oppure null se la posizione
+ * @returns [{uci, p, n, esiti?}] ordinate per frequenza, oppure null se la posizione
  * non e' nel libro (o e' stata raggiunta da troppo poche partite).
  * p e' la quota sul totale delle partite: le mosse rare scartate da libro.py
  * mancano, quindi la somma puo' stare un po' sotto 1, come nel surrogato.
+ * esiti (formato 2): quote di vittorie/patte/sconfitte per chi gioca la mossa
+ * e durata media della partita in semimosse. Serviranno agli stili.
  */
 export async function mosse(fen, elo, top = 4) {
   const pos = await carica(elo);
@@ -63,8 +68,15 @@ export async function mosse(fen, elo, top = 4) {
   const legali = new Set(new Chess(fen).moves({ verbose: true }).map((m) => m.lan));
   const n = riga[0];
   const out = [];
-  for (let i = 1; i < riga.length; i += 2) {
-    if (legali.has(riga[i])) out.push({ uci: riga[i], p: riga[i + 1] / n, n: riga[i + 1], libro: true });
+  const passo = pos.passo || 2;
+  for (let i = 1; i < riga.length; i += passo) {
+    if (!legali.has(riga[i])) continue;
+    const c = riga[i + 1];
+    const m = { uci: riga[i], p: c / n, n: c, libro: true };
+    if (passo >= 6) {
+      m.esiti = { vinte: riga[i + 2] / c, patte: riga[i + 3] / c, perse: riga[i + 4] / c, durata: riga[i + 5] };
+    }
+    out.push(m);
   }
   return out.length ? out.slice(0, top) : null;
 }
