@@ -82,6 +82,19 @@ def fasce_di(we, be):
             if e - LARGHEZZA <= we < e + LARGHEZZA and e - LARGHEZZA <= be < e + LARGHEZZA]
 
 
+# Esito per chi ha mosso: indice in [conteggio, vinte, patte, perse, semimosse]
+ESITI = {"1-0": (1, 3), "0-1": (3, 1), "1/2-1/2": (2, 2)}  # (se muove il bianco, se muove il nero)
+
+
+def lunghezza(testo):
+    """Semimosse totali della partita (non solo le prime PLY_MAX)."""
+    n = 0
+    for t in RE_GRAFFE.sub(" ", testo).split():
+        if not (RE_NUMERO.match(t) or t in RISULTATI):
+            n += 1
+    return n
+
+
 def mosse_san(testo):
     testo = RE_GRAFFE.sub(" ", testo)
     out = []
@@ -222,7 +235,7 @@ def sfoltisci(conti):
     riempirebbe la memoria. Una posizione che arrivera' a MIN_POSIZIONE perde
     al massimo un'occorrenza, cioe' niente."""
     for pos in conti.values():
-        via = [k for k, (ply, c) in pos.items() if ply >= 8 and sum(c.values()) == 1]
+        via = [k for k, (ply, c) in pos.items() if ply >= 8 and sum(v[0] for v in c.values()) == 1]
         for k in via:
             del pos[k]
 
@@ -235,8 +248,12 @@ def main():
     ap.add_argument("--uscita", default=os.path.join(QUI, "data"))
     args = ap.parse_args()
 
-    # fascia -> chiave posizione -> [ply minimo, Counter(uci)]
-    conti = {e: defaultdict(lambda: [PLY_MAX, Counter()]) for e in FASCE}
+    # fascia -> chiave posizione -> [ply minimo, {uci: [conteggio, vinte, patte, perse, semimosse]}]
+    # vinte/patte/perse sono dal punto di vista di chi ha giocato la mossa;
+    # semimosse e' la somma delle lunghezze delle partite, per la media.
+    # Servono agli stili: un aggressivo sceglie linee con poche patte e
+    # partite corte, un conservatore il contrario.
+    conti = {e: defaultdict(lambda: [PLY_MAX, {}]) for e in FASCE}
     usate = Counter()
     lette = 0
     cache = Cache()
@@ -264,6 +281,9 @@ def main():
                     break
                 continue
 
+            fine = testo.rsplit(None, 1)[-1] if testo.strip() else ""
+            esito = ESITI.get(tag.get("Result")) or ESITI.get(fine)  # header o fondo del movetext
+            durata = lunghezza(testo)
             fen = inizio
             try:
                 for ply, san in enumerate(mosse_san(testo)):
@@ -272,7 +292,13 @@ def main():
                     for e in fasce:
                         voce = conti[e][k]
                         voce[0] = min(voce[0], ply)
-                        voce[1][uci] += 1
+                        st = voce[1].get(uci)
+                        if st is None:
+                            st = voce[1][uci] = [0, 0, 0, 0, 0]
+                        st[0] += 1
+                        st[4] += durata
+                        if esito:
+                            st[esito[ply % 2]] += 1
                     fen = dopo
             except ValueError:
                 pass  # mossa illeggibile: teniamo quello che c'era prima
@@ -289,15 +315,16 @@ def main():
     for e in FASCE:
         pos = {}
         for k, (ply, c) in conti[e].items():
-            n = sum(c.values())
+            n = sum(v[0] for v in c.values())
             if n < MIN_POSIZIONE:
                 continue
-            tenute = [(u, x) for u, x in c.most_common(MAX_MOSSE) if x / n >= MIN_QUOTA]
+            ordinate = sorted(c.items(), key=lambda kv: -kv[1][0])[:MAX_MOSSE]
+            tenute = [(u, v) for u, v in ordinate if v[0] / n >= MIN_QUOTA]
             if not tenute:
                 continue
             riga = [n]
-            for u, x in tenute:
-                riga += [u, x]
+            for u, (x, vi, pa, pe, sm) in tenute:
+                riga += [u, x, vi, pa, pe, round(sm / x)]
             pos[k] = riga
         dati = {
             "meta": {
@@ -307,8 +334,10 @@ def main():
                 "partite": usate[e],
                 "min_posizione": MIN_POSIZIONE,
                 "ply_max": PLY_MAX,
+                "formato": 2,
+                "campi": ["uci", "partite", "vinte", "patte", "perse", "semimosse_medie"],
             },
-            # chiave -> [partite che raggiungono la posizione, uci, conteggio, uci, conteggio, ...]
+            # chiave -> [partite che raggiungono la posizione, poi per ogni mossa i 6 "campi"]
             "pos": pos,
         }
         nome = os.path.join(args.uscita, f"libro-{e}.json")

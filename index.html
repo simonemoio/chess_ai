@@ -169,7 +169,6 @@ span.ico{width:auto;height:auto;vertical-align:baseline;font-family:"Segoe UI Sy
  background:var(--ko-bg);border:1px solid var(--ko-bd);color:var(--ko-tx)}
 .sk-att.ric{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--ok-tx)}
 
-#stile{font:inherit;font-size:13px;min-height:38px;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);max-width:100%}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{border:0;border-radius:0;min-height:38px;padding:6px 12px;font-size:13px;background:var(--card)}
 .seg button + button{border-left:1px solid var(--line)}
@@ -265,30 +264,29 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
 .avviso{background:var(--wa-bg);border:1px solid var(--wa-bd);color:var(--wa-tx);border-radius:12px;
  padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
 </style>
-<link rel="stylesheet" href="css/temi.css?v=20261020180612">
-<meta name="versione" content="20261020180612">
+<link rel="stylesheet" href="css/temi.css?v=20261020182454">
+<meta name="versione" content="20261020182454">
 <!-- Versione dei file: la aggiorna versione.py a ogni commit. Il numero cambia l'indirizzo
      di ogni file, cosi' il browser non mescola file vecchi in cache con quelli nuovi. -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=20261020180612",
-    "./js/analisi.js": "./js/analisi.js?v=20261020180612",
-    "./js/aperture.js": "./js/aperture.js?v=20261020180612",
-    "./js/avversario.js": "./js/avversario.js?v=20261020180612",
-    "./js/conteggio.js": "./js/conteggio.js?v=20261020180612",
-    "./js/diagramma.js": "./js/diagramma.js?v=20261020180612",
-    "./js/libro.js": "./js/libro.js?v=20261020180612",
-    "./js/spiega.js": "./js/spiega.js?v=20261020180612",
-    "./js/linee.js": "./js/linee.js?v=20261020180612",
-    "./js/minacce.js": "./js/minacce.js?v=20261020180612",
-    "./js/motore.js": "./js/motore.js?v=20261020180612",
-    "./js/partita.js": "./js/partita.js?v=20261020180612",
-    "./js/revisione.js": "./js/revisione.js?v=20261020180612",
-    "./js/stile.js": "./js/stile.js?v=20261020180612",
-    "./js/strutture.js": "./js/strutture.js?v=20261020180612",
-    "./js/teoria.js": "./js/teoria.js?v=20261020180612",
-    "./vendor/chess.js": "./vendor/chess.js?v=20261020180612"
+    "./js/app.js": "./js/app.js?v=20261020182454",
+    "./js/analisi.js": "./js/analisi.js?v=20261020182454",
+    "./js/aperture.js": "./js/aperture.js?v=20261020182454",
+    "./js/avversario.js": "./js/avversario.js?v=20261020182454",
+    "./js/conteggio.js": "./js/conteggio.js?v=20261020182454",
+    "./js/diagramma.js": "./js/diagramma.js?v=20261020182454",
+    "./js/libro.js": "./js/libro.js?v=20261020182454",
+    "./js/spiega.js": "./js/spiega.js?v=20261020182454",
+    "./js/linee.js": "./js/linee.js?v=20261020182454",
+    "./js/minacce.js": "./js/minacce.js?v=20261020182454",
+    "./js/motore.js": "./js/motore.js?v=20261020182454",
+    "./js/partita.js": "./js/partita.js?v=20261020182454",
+    "./js/revisione.js": "./js/revisione.js?v=20261020182454",
+    "./js/strutture.js": "./js/strutture.js?v=20261020182454",
+    "./js/teoria.js": "./js/teoria.js?v=20261020182454",
+    "./vendor/chess.js": "./vendor/chess.js?v=20261020182454"
   }
 }
 </script>
@@ -318,16 +316,6 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
       <span style="font-size:13px;color:var(--mut)">Avversario</span>
       <input type="range" id="elo" min="1100" max="1900" step="100" value="1500">
       <b id="elov" style="font-variant-numeric:tabular-nums">1500</b>
-    </div>
-    <div class="bar">
-      <span style="font-size:13px;color:var(--mut)">Carattere</span>
-      <select id="stile" title="Cambia quali errori fa l'avversario, non quanto è forte">
-        <option value="neutro">Neutro</option>
-        <option value="posizionale">Posizionale: manovra, poche avventure</option>
-        <option value="prudente">Prudente: cambia volentieri, evita complicazioni</option>
-        <option value="attaccante">Attaccante: va verso il tuo re</option>
-        <option value="avventuriero">Avventuriero: attacca e sacrifica, anche a torto</option>
-      </select>
     </div>
     <div class="bar">
       <label class="chk"><input type="checkbox" id="auto" checked> L’avversario muove da solo</label>
@@ -430,6 +418,6 @@ setTimeout(function () {
   });
 }, 4000);
 </script>
-<script type="module" src="js/app.js?v=20261020180612"></script>
+<script type="module" src="js/app.js?v=20261020182454"></script>
 </body>
 </html>
