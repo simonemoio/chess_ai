@@ -76,6 +76,7 @@ js/partita.js           esporta la partita in PGN e la manda col foglio di condi
 js/diagramma.js         scacchiera dell'apertura nella scheda didattica, mossa per mossa
 js/linee.js             "Dove porta": linea tipica di ogni apertura fino al mediogioco, con commento
 js/libro.js             libro d'aperture per fascia Elo (generato da libro.py)
+js/stile.js             carattere dell'avversario (attacco, rischio) e preset
 js/spiega.js            il perche' degli errori nella revisione (regole su linee del motore e materiale)
 js/minacce.js           pezzi in presa (attaccati e indifesi, o attaccati da un pezzo che vale meno)
 js/conteggio.js         conteggio visite ed eventi (GoatCounter, spento finché non lo configuri)
@@ -203,6 +204,12 @@ e si ferma quando ogni fascia ha 60.000 partite. Regole:
 - prime 24 semimosse; una posizione entra se ci arrivano almeno 40 partite;
   una mossa entra se la gioca almeno il 2%.
 
+Per ogni mossa il libro registra anche vittorie, patte e sconfitte (dal punto
+di vista di chi l'ha giocata) e la durata media della partita in semimosse
+(formato 2). Serviranno agli stili dell'avversario: un aggressivo preferisce
+linee con poche patte e partite corte. `js/libro.js` legge anche i file del
+formato 1, che hanno solo i conteggi.
+
 Appena la posizione esce dal libro si passa al surrogato su Stockfish. Senza i
 file il sito funziona come prima. I dati sono CC0 e possono stare nel
 repository. Opzioni: `python libro.py --help`.
@@ -221,3 +228,38 @@ python copertura.py --file lichess-2026-09.pgn.zst --stockfish percorso/stockfis
 
 Scrive `data/copertura.json`. Serve a decidere se il bot deve poter giocare
 anche mosse fuori dalle candidate del motore.
+
+
+## Carattere dell'avversario
+
+Due assi in [-1, 1]: **attacco** (posizionale … aggressivo) e **rischio**
+(conservativo … spregiudicato). Cinque preset nel menu "Carattere": Neutro,
+Posizionale, Prudente, Attaccante, Avventuriero. Il carattere cambia quali
+errori fa il bot, non quanto e' forte.
+
+- Nel surrogato ogni candidata riceve un bonus `PESO * (attacco * segnale +
+  rischio * segnale)`, con segnali calcolati da chess.js: scacchi, catture,
+  pezzi verso il re avversario, assalto di pedoni, tensione, cambi,
+  materiale lasciato a occhio. L'Avventuriero accetta sacrifici fino a
+  150 cp peggiori secondo il motore.
+- Nel libro chi attacca e rischia preferisce le linee con meno patte e
+  partite piu' corte (esiti del formato 2), con un fattore fra 0,5 e 2.
+- Il carattere entra anche nell'albero e nella linea simulata.
+
+Taratura: `node prova_stili.mjs` (posizioni in `.dev/`, `--nuove` per
+rigenerarle, `--verifica` per controllare che la formula veloce coincida
+con `distribuzione()`). Per ogni preset trova il moltiplicatore di
+temperatura `t` che riporta la perdita media per mossa a quella del neutro.
+Risultati con PESO 0,14 a 1500 (866 posizioni):
+
+| stile        | t    | perdita | scacchi | sacrifici |
+|--------------|------|---------|---------|-----------|
+| neutro       | 1    | 3,90    | 5,8%    | 5,6%      |
+| posizionale  | 0,91 | 3,88    | 3,2%    | 3,7%      |
+| prudente     | 1,09 | 3,89    | 6,3%    | 3,5%      |
+| attaccante   | 1    | 3,89    | 9,5%    | 8,9%      |
+| avventuriero | 0,84 | 3,85    | 9,9%    | 13,2%     |
+
+La taratura e' una media su 1100/1500/1900: agli estremi l'Avventuriero e'
+un po' piu' forte del neutro a 1100 (-4% di perdita) e un po' piu' debole a
+1900 (+7%).

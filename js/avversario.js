@@ -29,6 +29,7 @@
 import { Chess } from "../vendor/chess.js";
 import { minacciate } from "./minacce.js";
 import { mosse as mosseLibro } from "./libro.js";
+import { attuale as stileAttuale, bonus as bonusStile, TOLLERANZA_SACRIFICIO } from "./stile.js";
 
 /** Probabilita' di vittoria in [0, 1] di chi muove (curva Lichess). */
 export function vittoria(cp) {
@@ -192,7 +193,12 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10, ripre
   const cand = await motore.multipv(fen, 8, depth);
   if (!cand.length) return [];
 
-  const t = temperatura(elo);
+  // Il carattere sposta la scelta fra mosse vicine (bonus) e lascia passare
+  // sacrifici un po' scorretti (tolleranza); la temperatura del preset e'
+  // tarata perche' la forza media resti quella del livello.
+  const stile = stileAttuale();
+  const t = temperatura(elo) * stile.t;
+  const tolleranza = TOLLERANZA_SACRIFICIO * Math.max(0, stile.rischio) * Math.max(0, stile.attacco);
   // riferimento: la migliore candidata senza matto (se sono tutti matti, scala assoluta)
   const senzaMatto = cand.filter((c) => c.matto === null || c.matto === undefined);
   const rif = senzaMatto.length ? Math.max(...senzaMatto.map((c) => c.cp ?? 0)) : null;
@@ -212,7 +218,7 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10, ripre
     // umano la gioca per quello.
     const apparente = visibili[i] - inevitabile;
     const cp = c.cp ?? 0;
-    const sacrificio = rif !== null && cp >= rif - 50 && cp > -300;
+    const sacrificio = rif !== null && cp >= rif - 50 - tolleranza && cp > -300;
     if (apparente > 0 && (c.matto ?? null) === null && !sacrificio) {
       u = Math.min(u, vittoria(-apparente));
     }
@@ -221,7 +227,8 @@ export async function distribuzione(motore, fen, elo, top = 4, depth = 10, ripre
     if (ripresa && c.uci.slice(2, 4) === ripresa && catturaIn(fen, c.uci)) {
       diff = -PREMIO_RIPRESA;
     }
-    return { uci: c.uci, s: (u - diff) / t };
+    const b = bonusStile(fen, c.uci, visibili[i], stile);
+    return { uci: c.uci, s: (u - diff + b) / t };
   });
 
   const max = Math.max(...punteggi.map((x) => x.s));

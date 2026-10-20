@@ -18,6 +18,7 @@ import { pgn, nomeFile, invia } from "./partita.js";
 import * as Diag from "./diagramma.js";
 import { LINEE } from "./linee.js";
 import { minacce } from "./minacce.js";
+import { imposta as impostaStile, chiave as chiaveStile, attuale as stileAttuale } from "./stile.js";
 
 // U+FE0E forza la resa testuale: senza, sui telefoni il pedone U+265F diventa
 // un'emoji, che ignora il colore CSS ed e' piu' grande degli altri pezzi.
@@ -492,7 +493,7 @@ async function dopoMossa() {
         (x) => x.lan === scelta.uci || x.from + x.to === scelta.uci.slice(0, 4));
       if (v) {
         S.gioco.move(v.san);
-        S.sceltaBot.set(S.gioco.history().length - 1, { p: scelta.p, elo: elo() });
+        S.sceltaBot.set(S.gioco.history().length - 1, { p: scelta.p, elo: elo(), stile: stileAttuale().nome });
         S.chiavi.push(chiave(S.gioco.fen()));
         S.vista = null;
         disegna();
@@ -967,7 +968,8 @@ function risultato() {
 function testoPgn() {
   const note = new Map();
   for (const [i, b] of S.sceltaBot) {
-    note.set(i, `avversario ${b.elo}, probabilità ${Math.round(b.p * 1000) / 10}%`);
+    note.set(i, `avversario ${b.elo}${b.stile && b.stile !== "Neutro" ? " " + b.stile.toLowerCase() : ""}, `
+      + `probabilità ${Math.round(b.p * 1000) / 10}%`);
   }
   for (const [i, r] of S.revisione) {
     if (!r || !r.classe) continue;
@@ -977,7 +979,8 @@ function testoPgn() {
       + (r.perche ? ". " + r.perche : "");
     note.set(i, prima ? prima + "; " + t : t);
   }
-  const avv = `Avversario simulato ${elo()}`;
+  const avv = `Avversario simulato ${elo()}`
+    + (chiaveStile() !== "neutro" ? ` (${stileAttuale().nome.toLowerCase()})` : "");
   const meta = document.querySelector('meta[name="versione"]');
   return pgn({
     mosse: S.gioco.history(),
@@ -1046,6 +1049,16 @@ async function avvia() {
     else if (ev.key === "Escape") esciVista();
   });
   el("elo").oninput = () => { el("elov").textContent = elo(); };
+  // Il carattere entra anche nell'albero: le probabilita' delle risposte e
+  // l'EV pratico delle tue mosse dipendono da chi hai davanti.
+  try { impostaStile(localStorage.getItem("stile") || "neutro"); } catch {}
+  el("stile").value = chiaveStile();
+  el("stile").onchange = async () => {
+    impostaStile(el("stile").value);
+    try { localStorage.setItem("stile", chiaveStile()); } catch {}
+    evento("cambio-stile");
+    if (!S.occupato) await analizza();
+  };
   el("elo").onchange = async () => {
     evento("cambio-elo");
     if (!S.occupato) await analizza();
