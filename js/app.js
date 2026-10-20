@@ -203,9 +203,11 @@ function disegnaVista() {
     + `<div class="vbtn">`
     + `<button id="vPrima" ${S.vista.p <= 0 ? "disabled" : ""} aria-label="Mossa precedente">&#9664;</button>`
     + `<button id="vDopo" ${S.vista.p >= n ? "disabled" : ""} aria-label="Mossa successiva">&#9654;</button>`
+    + `<button id="vRiprendi" title="Cancella le mosse successive e continua la partita da questa posizione">Riprendi da qui</button>`
     + `<button id="vTorna">Torna alla partita</button></div>`;
   el("vPrima").onclick = () => passo(-1);
   el("vDopo").onclick = () => passo(1);
+  el("vRiprendi").onclick = () => riprendiDa(S.vista.p);
   el("vTorna").onclick = () => esciVista();
 }
 
@@ -236,6 +238,26 @@ function passo(d) {
   const n = S.gioco.history().length;
   const p = S.vista ? S.vista.p : n;
   vediPosizione(p + d);
+}
+
+/**
+ * Riprende la partita dalla posizione dopo `p` semimosse: le mosse successive
+ * si cancellano. Se in quella posizione muove l'avversario, risponde subito
+ * (con una nuova estrazione: non e' detto che rigiochi la stessa mossa).
+ * Dalla vista di un errore si riparte quindi proprio prima dell'errore.
+ */
+async function riprendiDa(p) {
+  if (S.occupato) return;
+  const n = S.gioco.history().length;
+  p = Math.max(0, Math.min(p, n));
+  for (let k = n; k > p; k--) { S.gioco.undo(); S.chiavi.pop(); }
+  S.sel = null; S.bersagli = [];
+  S.vista = null; S.frecceCand = []; S.evidenza = null; S.fissata = false;
+  potaRevisione();
+  evento("riprendi-da-qui");
+  disegna(); mostraRisposta(null);
+  if (S.auto && !S.gioco.isGameOver() && S.gioco.turn() !== S.mio) await dopoMossa();
+  else await analizza();
 }
 
 function esciVista() {
@@ -608,8 +630,11 @@ function doveporta(chiave, mosse) {
  * Ogni <figure class="sk-diag"> porta le mosse in data-mosse e, facoltativi,
  * data-fen0 (posizione di partenza), data-da (prima mossa da mostrare) e
  * data-tipo ("apertura", "meta", "linea") che decide le didascalie.
- * Si parte dalla posizione finale, con in evidenza i pezzi che si sono mossi;
- * i pulsanti scorrono mossa per mossa.
+ * Le linee future ("linea", "meta") partono dalla posizione di adesso e si
+ * scorrono in avanti: chi guarda segue le mosse nell'ordine in cui
+ * avverrebbero. Lo schema di un'apertura ("apertura") parte invece dalla
+ * posizione finale, che e' il punto della scheda. In fondo alla linea sono
+ * in evidenza i pezzi che si sono mossi.
  */
 function montaDiagramma(box) {
   for (const fig of box.querySelectorAll(".sk-diag")) montaUno(fig);
@@ -622,12 +647,12 @@ function montaUno(fig) {
   const n = r.mosse.length;
   const da = Math.min(+fig.dataset.da || 0, n);
   const evidenza = Diag.caseCambiate(r.fens[da], r.fens[n]);
-  let i = n;
+  let i = tipo === "apertura" ? n : da;
 
   const didascalia = () => {
     if (i === da) {
-      return tipo === "meta" ? "La posizione dell’apertura: da qui parte la linea"
-        : tipo === "linea" ? "La posizione di adesso"
+      return tipo === "meta" ? "La posizione dell’apertura: da qui parte la linea. Avanti con &#9654;"
+        : tipo === "linea" ? "La posizione di adesso. Avanti con &#9654; per vedere come continua"
         : "Posizione di partenza";
     }
     if (i < n) return `Dopo ${Diag.etichetta(r, i)}`;
@@ -655,7 +680,7 @@ function montaUno(fig) {
       b.onclick = (ev) => {
         ev.stopPropagation();
         i = Math.max(da, Math.min(n, i + +b.dataset.d));
-        if (i !== n) evento("diagramma-passo-" + tipo);
+        evento("diagramma-passo-" + tipo);
         disegnaQui();
       };
     }
