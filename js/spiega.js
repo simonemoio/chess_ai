@@ -326,7 +326,10 @@ export function controllo(testo, f) {
 export function perche(f) {
   if (f.uguale) return "È la mossa migliore.";
   const m = f.materiale;
-  const perso = m.ora - m.conGiocata;            // quanto perdi davvero
+  // quanto perdi davvero: rispetto a adesso, ma non piu' di quanto perderesti
+  // comunque con la mossa migliore (se si e' a meta' di uno scambio, "adesso"
+  // conta un pezzo che si perde in ogni caso)
+  const perso = Math.min(m.ora - m.conGiocata, m.conLaMigliore - m.conGiocata);
   const mancato = m.conLaMigliore - m.conGiocata; // differenza con la migliore
   const r = f.risposta[0];
 
@@ -334,13 +337,15 @@ export function perche(f) {
   if (f.mattoPerso) return `C'era il matto in ${f.mattoPerso}, a partire da ${f.migliore}.`;
 
   // 0. il pezzo appena mosso va in una casa dove puo' essere preso
-  if (f.mossoInPresa && VALORE_NOME[f.mossoInPresa.pezzo] >= 3 && perso >= 1) {
+  if (f.mossoInPresa && VALORE_NOME[f.mossoInPresa.pezzo] >= 3 && perso >= 2) {
     const x = f.mossoInPresa;
     return `Metti ${articolo(x.pezzo)} in ${x.casa}, dove può essere ${FEMMINILE.has(x.pezzo) ? "presa" : "preso"}` +
       (x.da.length ? ` (${x.da.join(" o ")})` : "") + `: in tutto perdi ${equivalente(perso)}.`;
   }
   // 1. il pezzo lasciato in presa viene preso subito
-  if (f.rispostaCattura && f.inPresa.some((x) => x.endsWith(" " + f.rispostaCattura.casa))) {
+  // (per i pezzi la perdita deve essere di almeno 2: altrimenti e' uno scambio)
+  if (f.rispostaCattura && f.inPresa.some((x) => x.endsWith(" " + f.rispostaCattura.casa)) &&
+      perso >= Math.min(2, VALORE_NOME[f.rispostaCattura.pezzo])) {
     const p = f.rispostaCattura.pezzo;
     return `Lasci ${articolo(p)} in ${f.rispostaCattura.casa} senza difesa sufficiente: ` +
       `l'avversario ${FEMMINILE.has(p) ? "la" : "lo"} prende con ${r}` +
